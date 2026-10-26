@@ -2,6 +2,8 @@ from nuimages import NuImages
 from collections import Counter, defaultdict
 import json
 from pathlib import Path
+from datetime import datetime, timedelta, timezone
+
 
 # nuImages fine class -> nuScenes detection class (10). Anything missing is dropped.
 CLASS_MAP = {
@@ -25,6 +27,15 @@ CLASSES = ["car", "truck", "bus", "trailer", "construction_vehicle",
 CLASS_ID = {name: i + 1 for i, name in enumerate(CLASSES)}   # COCO ids start at 1
 
 
+
+def local_time(timestamp_us, logfile):
+    """nuImages timestamps are UTC microseconds; the log name ends with the local offset, e.g. +0800."""
+    off = logfile[-5:]                       # '+0800' or '-0400'
+    sign = 1 if off[0] == "+" else -1
+    tz = timezone(sign * timedelta(hours=int(off[1:3]), minutes=int(off[3:5])))
+    return datetime.fromtimestamp(timestamp_us / 1e6, tz)
+
+
 def boxes_by_frame(n):
     by_frame = defaultdict(list)
     for a in n.object_ann:
@@ -40,6 +51,8 @@ def convert(dataroot: str, version: str, out_path: str):
     for img_id, s in enumerate(n.sample, start=1):
         sd = n.get("sample_data", s["key_camera_token"])
         log = n.get("log", s["log_token"])
+        lt = local_time(sd["timestamp"], log["logfile"])
+
         images.append({
             "id": img_id,
             "file_name": sd["filename"],
@@ -47,6 +60,8 @@ def convert(dataroot: str, version: str, out_path: str):
             "height": sd["height"],
             "location": log["location"],
             "timestamp": sd["timestamp"],
+            "local_hour": lt.hour,
+            "daypart": "night" if lt.hour >= 19 or lt.hour < 7 else "day",
         })
         for a in by_frame[sd["token"]]:
             name = n.get("category", a["category_token"])["name"]
