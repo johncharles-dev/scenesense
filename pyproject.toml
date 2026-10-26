@@ -1,10 +1,10 @@
 [project]
 name = "scenesense"
 version = "0.1.0"
-description = "Add your description here"
+description = "Urban scene understanding on Singapore driving video: detection + tracking, grounded VQA, and an LLM scene-query agent."
 readme = "README.md"
 authors = [
-    { name = "johncharles-dev", email = "johncharles.steve@gmail.com" }
+    { name = "John Charles", email = "johncharles.steve@gmail.com" }
 ]
 requires-python = ">=3.11"
 dependencies = [
