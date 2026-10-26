@@ -11,3 +11,5 @@ __pycache__/
 reports/*.png
 .ruff_cache/
 .pytest_cache/
+runs/
+mlflow.db
