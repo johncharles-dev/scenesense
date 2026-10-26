@@ -41,11 +41,16 @@ def test_fast_resample_matches_materialised(tmp_path):
 
 
 def test_perfect_is_one():
-    point, lo, hi, _ = bootstrap_map(GT, "data/coco/pred_perfect.json", n_boot=20)
+    point, lo, hi, _ = bootstrap_map(GT, "data/coco/pred_perfect.json", n_boot=20)["pred_perfect"]
     assert point == 1.0 and lo == 1.0 and hi == 1.0
 
 
 def test_seed_is_deterministic():
-    a = bootstrap_map(GT, PRED, n_boot=10, seed=1)[3]
-    b = bootstrap_map(GT, PRED, n_boot=10, seed=1)[3]
+    a = bootstrap_map(GT, PRED, n_boot=10, seed=1)["pred_shifted"][3]
+    b = bootstrap_map(GT, PRED, n_boot=10, seed=1)["pred_shifted"][3]
     assert np.array_equal(a, b)
+
+def test_paired_difference_excludes_zero():
+    res = bootstrap_map(GT, ["data/coco/pred_perfect.json", PRED], n_boot=50)
+    point, lo, hi, _ = res["pred_perfect-pred_shifted"]
+    assert point > 0 and lo > 0

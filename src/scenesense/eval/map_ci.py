@@ -4,7 +4,8 @@ from pycocotools.cocoeval import COCOeval
 import contextlib, io
 import numpy as np
 import copy
-
+import json
+from pathlib import Path
 
 def _quiet(fn):
     """Run fn() with COCOeval's printing suppressed."""
@@ -38,19 +39,42 @@ def _map_on_subset(ev, img_ids):
     return float(sub.stats[0])
 
 
-def bootstrap_map(gt_path, pred_path, n_boot=500, seed=0):
+def bootstrap_map(gt_path, pred_paths, n_boot=500, seed=0, img_ids=None):
+    """Paired bootstrap: returns {name: (point, lo, hi, samples)} plus 'A-B' difference entries."""
+    if isinstance(pred_paths, str):
+        pred_paths = [pred_paths]
     gt = _quiet(lambda: COCO(gt_path))
-    dt = _quiet(lambda: gt.loadRes(pred_path))
-    img_ids = sorted(gt.getImgIds())
-    ev = _evaluate_once(gt, dt, img_ids)
-    point = _map_on_subset(ev, img_ids)
+    ids = sorted(img_ids if img_ids is not None else gt.getImgIds())
+    evs = {}
+    for p in pred_paths:
+        name = Path(p).stem
+        dt = _quiet(lambda: gt.loadRes(p))
+        evs[name] = _evaluate_once(gt, dt, ids)
     rng = np.random.default_rng(seed)
-    samples = np.empty(n_boot)
+    samples = {k: np.empty(n_boot) for k in evs}
     for b in range(n_boot):
-        ids = list(rng.choice(img_ids, size=len(img_ids), replace=True))
-        samples[b] = _map_on_subset(ev, ids)
-    lo, hi = np.percentile(samples, [2.5, 97.5])
-    return point, float(lo), float(hi), samples
+        draw = list(rng.choice(ids, size=len(ids), replace=True))   # same draw for every model
+        for k, ev in evs.items():
+            samples[k][b] = _map_on_subset(ev, draw)
+    out = {}
+    for k, ev in evs.items():
+        lo, hi = np.percentile(samples[k], [2.5, 97.5])
+        out[k] = (_map_on_subset(ev, ids), float(lo), float(hi), samples[k])
+    names = list(evs)
+    for other in names[1:]:
+        d = samples[names[0]] - samples[other]
+        lo, hi = np.percentile(d, [2.5, 97.5])
+        out[f"{names[0]}-{other}"] = (out[names[0]][0] - out[other][0], float(lo), float(hi), d)
+    return out
+
+
+def select_images(gt_path, slice_expr):
+    """'location=singapore-onenorth' -> list of image ids with that field value."""
+    if not slice_expr:
+        return None
+    key, val = slice_expr.split("=", 1)
+    data = json.loads(Path(gt_path).read_text())
+    return [im["id"] for im in data["images"] if str(im.get(key)) == val]
 
 def coco_map(gt_path: str, pred_path: str) -> float:
     gt = COCO(gt_path)
@@ -63,6 +87,18 @@ def coco_map(gt_path: str, pred_path: str) -> float:
 
 
 if __name__ == "__main__":
-    import sys
-    point, lo, hi, _ = bootstrap_map(sys.argv[1], sys.argv[2], n_boot=100)
-    print(f"mAP = {point:.3f}  95% CI [{lo:.3f}, {hi:.3f}]")
+    import argparse
+    ap = argparse.ArgumentParser(description="COCO mAP with paired bootstrap 95% CIs.")
+    ap.add_argument("--gt", required=True)
+    ap.add_argument("--pred", action="append", required=True, help="repeat for several models")
+    ap.add_argument("--n-boot", type=int, default=500)
+    ap.add_argument("--slice", default=None, help="e.g. location=singapore-onenorth")
+    ap.add_argument("--out", default=None, help="write results JSON")
+    a = ap.parse_args()
+    res = bootstrap_map(a.gt, a.pred, a.n_boot, img_ids=select_images(a.gt, a.slice))
+    rows = {}
+    for k, (point, lo, hi, _) in res.items():
+        print(f"{k:28s} {point:.3f}  95% CI [{lo:.3f}, {hi:.3f}]")
+        rows[k] = {"map": point, "ci95": [lo, hi]}
+    if a.out:
+        Path(a.out).write_text(json.dumps({"slice": a.slice, "n_boot": a.n_boot, "results": rows}, indent=2))
