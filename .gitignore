@@ -1,0 +1,13 @@
+.venv/
+data/
+mlruns/
+__pycache__/
+*.pyc
+*.pt
+*.pth
+*.safetensors
+*.onnx
+*.engine
+reports/*.png
+.ruff_cache/
+.pytest_cache/
