@@ -1,0 +1,13 @@
+{
+  "slice": "location=singapore-onenorth",
+  "n_boot": 200,
+  "results": {
+    "rtdetr_zeroshot_val": {
+      "map": 0.15857735376892598,
+      "ci95": [
+        0.1553182422796506,
+        0.16208567267186363
+      ]
+    }
+  }
+}

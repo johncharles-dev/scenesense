@@ -6,6 +6,7 @@ import numpy as np
 import copy
 import json
 from pathlib import Path
+from tqdm import tqdm
 
 def _quiet(fn):
     """Run fn() with COCOeval's printing suppressed."""
@@ -21,22 +22,27 @@ def _evaluate_once(gt, dt, img_ids):
 
 
 def _map_on_subset(ev, img_ids):
-    """Re-aggregate an evaluated COCOeval over a (resampled) list of image ids."""
+    """mAP@[.5:.95] (area=all, maxDets=100) over a (resampled) list of image ids."""
     p = ev.params
     pos = {iid: i for i, iid in enumerate(p.imgIds)}
     idx = [pos[i] for i in img_ids]
     n_img, n_area = len(p.imgIds), len(p.areaRng)
+    a_all = p.areaRngLbl.index("all")
     sub = COCOeval(ev.cocoGt, ev.cocoDt, iouType="bbox")
     sub.params = copy.deepcopy(p)
     sub.params.imgIds = list(img_ids)
+    sub.params.areaRng = [p.areaRng[a_all]]
+    sub.params.areaRngLbl = ["all"]
+    sub.params.maxDets = [p.maxDets[-1]]
     sub.evalImgs = []
     for c in range(len(p.catIds)):
-        for a in range(n_area):
-            base = c * n_area * n_img + a * n_img
-            sub.evalImgs.extend(ev.evalImgs[base + i] for i in idx)
+        base = c * n_area * n_img + a_all * n_img
+        sub.evalImgs.extend(ev.evalImgs[base + i] for i in idx)
     sub._paramsEval = sub.params
-    _quiet(lambda: (sub.accumulate(), sub.summarize()))
-    return float(sub.stats[0])
+    _quiet(sub.accumulate)
+    prec = sub.eval["precision"][..., 0, 0]      # [IoU, recall, class] for area=all, maxDets=100
+    valid = prec[prec > -1]
+    return float(valid.mean()) if valid.size else -1.0
 
 
 def bootstrap_map(gt_path, pred_paths, n_boot=500, seed=0, img_ids=None):
@@ -46,13 +52,13 @@ def bootstrap_map(gt_path, pred_paths, n_boot=500, seed=0, img_ids=None):
     gt = _quiet(lambda: COCO(gt_path))
     ids = sorted(img_ids if img_ids is not None else gt.getImgIds())
     evs = {}
-    for p in pred_paths:
+    for p in tqdm(pred_paths, desc="evaluate"):
         name = Path(p).stem
         dt = _quiet(lambda: gt.loadRes(p))
         evs[name] = _evaluate_once(gt, dt, ids)
     rng = np.random.default_rng(seed)
     samples = {k: np.empty(n_boot) for k in evs}
-    for b in range(n_boot):
+    for b in tqdm(range(n_boot), desc="bootstrap"):
         draw = list(rng.choice(ids, size=len(ids), replace=True))   # same draw for every model
         for k, ev in evs.items():
             samples[k][b] = _map_on_subset(ev, draw)
