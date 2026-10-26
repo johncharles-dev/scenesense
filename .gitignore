@@ -13,3 +13,5 @@ reports/*.png
 .pytest_cache/
 runs/
 mlflow.db
+mlflow.db
+runs/
