@@ -6,18 +6,23 @@ readme = "README.md"
 authors = [
     { name = "John Charles", email = "johncharles.steve@gmail.com" }
 ]
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.13"
 dependencies = [
     "accelerate>=1.15.0",
     "faster-coco-eval>=1.8.0",
     "lap>=0.5.13",
+    "ml-dtypes>=0.5",
     "mlflow>=3.17.2",
     "nuscenes-devkit>=1.2.0",
+    "nvidia-modelopt[onnx]>=0.44",
+    "onnx>=1.19.0",
+    "onnxslim>=0.1.98",
     "peft>=0.21.2",
     "pillow>=13.0.0",
     "pycocotools>=2.0.11",
     "pyyaml>=6.0.3",
     "supervision>=0.31.2",
+    "tensorrt-cu13>=11.4.0.106",
     "torch>=2.14.1",
     "torchvision>=0.29.1",
     "tqdm>=4.70.1",
