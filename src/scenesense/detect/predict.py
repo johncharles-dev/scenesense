@@ -11,7 +11,7 @@ from transformers import RTDetrForObjectDetection, RTDetrImageProcessor
 from scenesense.data.nuimages_to_coco import CLASS_ID
 
 # Pretrained COCO label -> our class, for the zero-shot baseline (only 6 of our 10 classes exist in COCO)
-COCO_TO_OURS = {"car": "car", "truck": "truck", "bus": "bus", "motorcycle": "motorcycle",
+COCO_TO_OURS = {"car": "car", "truck": "truck", "bus": "bus", "motorbike": "motorcycle",
                 "bicycle": "bicycle", "person": "pedestrian"}
 
 

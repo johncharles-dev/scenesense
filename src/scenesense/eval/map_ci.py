@@ -74,6 +74,22 @@ def bootstrap_map(gt_path, pred_paths, n_boot=500, seed=0, img_ids=None):
     return out
 
 
+def per_class_ap(gt_path, pred_path, img_ids=None):
+    """AP@[.5:.95] per class plus AP by object size (area=all/small/medium/large, maxDets=100)."""
+    gt = _quiet(lambda: COCO(gt_path))
+    dt = _quiet(lambda: gt.loadRes(pred_path))
+    ev = COCOeval(gt, dt, iouType="bbox")
+    ev.params.imgIds = sorted(img_ids if img_ids is not None else gt.getImgIds())
+    _quiet(lambda: (ev.evaluate(), ev.accumulate(), ev.summarize()))
+    prec = ev.eval["precision"][:, :, :, 0, -1]          # [IoU, recall, class] at area=all, maxDets=100
+    per_class = {}
+    for k, cid in enumerate(ev.params.catIds):
+        v = prec[:, :, k]
+        v = v[v > -1]
+        per_class[gt.cats[int(cid)]["name"]] = float(v.mean()) if v.size else float("nan")
+    sizes = {"small": float(ev.stats[3]), "medium": float(ev.stats[4]), "large": float(ev.stats[5])}
+    return per_class, sizes
+
 def select_images(gt_path, slice_expr):
     """'location=singapore-onenorth' -> list of image ids with that field value."""
     if not slice_expr:
@@ -95,12 +111,28 @@ def coco_map(gt_path: str, pred_path: str) -> float:
 if __name__ == "__main__":
     import argparse
     ap = argparse.ArgumentParser(description="COCO mAP with paired bootstrap 95% CIs.")
+    ap.add_argument("--per-class", action="store_true", help="print per-class and per-size AP, no bootstrap")
     ap.add_argument("--gt", required=True)
     ap.add_argument("--pred", action="append", required=True, help="repeat for several models")
     ap.add_argument("--n-boot", type=int, default=500)
     ap.add_argument("--slice", default=None, help="e.g. location=singapore-onenorth")
     ap.add_argument("--out", default=None, help="write results JSON")
     a = ap.parse_args()
+    if a.per_class:
+        ids = select_images(a.gt, a.slice)
+        rows = {}
+        for p in a.pred:
+            pc, sz = per_class_ap(a.gt, p, ids)
+            rows[Path(p).stem] = {"per_class": pc, "size": sz}
+        names = list(rows)
+        print(f"{'class':22s}" + "".join(f"{n[:18]:>20s}" for n in names))
+        for c in rows[names[0]]["per_class"]:
+            print(f"{c:22s}" + "".join(f"{rows[n]['per_class'][c]:20.3f}" for n in names))
+        for s in ("small", "medium", "large"):
+            print(f"{'AP ' + s:22s}" + "".join(f"{rows[n]['size'][s]:20.3f}" for n in names))
+        if a.out:
+            Path(a.out).write_text(json.dumps(rows, indent=2))
+        raise SystemExit
     res = bootstrap_map(a.gt, a.pred, a.n_boot, img_ids=select_images(a.gt, a.slice))
     rows = {}
     for k, (point, lo, hi, _) in res.items():
