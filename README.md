@@ -17,7 +17,7 @@ uv sync
 
 ## Data
 
-[nuImages v1.0](https://www.nuscenes.org/nuimages) — 67,279 train / 16,445 val keyframes (1600×900) from Singapore (one-north) and Boston (seaport). Licence CC BY-NC-SA 4.0; download requires registration and is not included here.
+[nuImages v1.0](https://www.nuscenes.org/nuimages) — 67,279 train / 16,445 val keyframes (1600×900) from Singapore (one-north, Queenstown) and Boston (seaport); train is 75% Singapore / 25% Boston. Licence CC BY-NC-SA 4.0; download requires registration and is not included here.
 
 The 25 nuImages categories are merged to the 10 nuScenes detection classes (car, truck, bus, trailer, construction_vehicle, motorcycle, bicycle, pedestrian, traffic_cone, barrier); other categories are dropped. Each COCO image record carries `location`, `timestamp`, `local_hour` and `daypart` so results can be sliced by city and time of day.
 
@@ -43,6 +43,16 @@ Paired bootstrap (200 resamples of val images): fine-tuning adds **+0.304** [0.2
 
 Small objects are the main weakness (AP small 0.205 vs 0.683 large); higher input resolution is the next experiment. Models were trained with their standard recipes at equal epochs and resolution, so this is a recipe-level comparison.
 
+### Slices
+
+| Slice | Frames | RT-DETR ft | YOLO11s ft | Zero-shot | RT-DETR − YOLO (paired) |
+|---|---|---|---|---|---|
+| All val | 16,445 | 0.477 [0.470, 0.483] | 0.404 [0.400, 0.410] | 0.173 | +0.072 [0.069, 0.076] |
+| Boston | 3,051 | 0.427 [0.417, 0.439] | 0.344 [0.333, 0.356] | 0.165 | +0.083 [0.076, 0.090] |
+| Night (one drive) | 192 | 0.489 [0.418, 0.594] | 0.332 [0.254, 0.417] | 0.201 | +0.158 [0.097, 0.236] |
+
+RT-DETR's lead holds in every slice and roughly doubles at night. The night slice is a single 192-frame drive, so its intervals understate the true uncertainty; treat it as indicative. Cross-slice differences for one model mix city and class-mix effects. Fine-tuned models drop 0.05–0.06 mAP in Boston while the zero-shot model drops only 0.008, suggesting fine-tuning specialised toward the majority city (train is 75% Singapore).
+
 ### Reproduce
 
 ```bash
@@ -50,6 +60,8 @@ uv run python -m scenesense.detect.train --out runs/rtdetr_r50_ft
 uv run python -m scenesense.detect.predict --model runs/rtdetr_r50_ft/final --out data/preds/rtdetr_ft_val.json
 uv run python -m scenesense.data.coco_to_yolo
 uv run yolo detect train data=data/yolo/nuimages.yaml model=yolo11s.pt imgsz=640 epochs=12 batch=32 project=$PWD/runs name=yolo11s_ft
+uv run yolo detect val data=data/yolo/nuimages.yaml model=runs/yolo11s_ft/weights/best.pt imgsz=640 conf=0.001 save_json=True project=$PWD/runs name=yolo11s_val
+cp runs/yolo11s_val/predictions.json data/preds/yolo11s_ft_val.json
 uv run python -m scenesense.eval.map_ci --gt data/coco/val.json \
     --pred data/preds/rtdetr_ft_val.json --pred data/preds/yolo11s_ft_val.json --n-boot 200
 ```
