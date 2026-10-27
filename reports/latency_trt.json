@@ -1,0 +1,20 @@
+[
+  {
+    "model": "yolo11s",
+    "runtime": "tensorrt",
+    "precision": "fp16",
+    "batch": 1,
+    "median_ms": 0.62,
+    "p95_ms": 0.62,
+    "img_per_s": 1625.7
+  },
+  {
+    "model": "yolo11s",
+    "runtime": "tensorrt",
+    "precision": "fp16",
+    "batch": 16,
+    "median_ms": 2.96,
+    "p95_ms": 2.97,
+    "img_per_s": 5409.7
+  }
+]
