@@ -10,6 +10,7 @@ requires-python = ">=3.11"
 dependencies = [
     "accelerate>=1.15.0",
     "faster-coco-eval>=1.8.0",
+    "lap>=0.5.13",
     "mlflow>=3.17.2",
     "nuscenes-devkit>=1.2.0",
     "peft>=0.21.2",
