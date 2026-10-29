@@ -103,6 +103,7 @@ def build(gt_path, out_path, per_type, seed):
             chosen = items[:n]
         rows += chosen
         print(f"  {qtype:11s} available {len(items):6d}  taken {len(chosen):5d}")
+    rng.shuffle(rows)
     for i, r in enumerate(rows):
         r["id"] = i
 
