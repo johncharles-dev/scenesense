@@ -53,6 +53,21 @@ Small objects are the main weakness (AP small 0.205 vs 0.683 large); higher inpu
 
 RT-DETR's lead holds in every slice and roughly doubles at night. The night slice is a single 192-frame drive, so its intervals understate the true uncertainty; treat it as indicative. Cross-slice differences for one model mix city and class-mix effects. Fine-tuned models drop 0.05–0.06 mAP in Boston while the zero-shot model drops only 0.008, suggesting fine-tuning specialised toward the majority city (train is 75% Singapore).
 
+## Results — grounded scene QA (Qwen2-VL-2B)
+
+1,248 templated test questions from nuImages val images (answers from ground-truth boxes; 200 hand-checked, 185 kept as a verified subset).
+
+| Type | Zero-shot | LoRA (r=16, 0.8% of weights) | Paired gain, 95% CI |
+|---|---|---|---|
+| Count (1–8, balanced) | 21.4% | 39.1% | +17.7 [+11.3, +25.0] |
+| Exists (yes/no) | 82.8% | 91.6% | +8.8 [+4.8, +12.8] |
+| Left / right | 78.8% | 95.2% | +16.4 [+11.6, +21.6] |
+| Box grounding (IoU ≥ 0.5) | 55.8% | 74.6% | +18.8 |
+| **All** | **59.0%** | **75.1%** | **+16.1 [+13.9, +18.6]** |
+| Verified subset (185) | 70.8% | 84.9% | +14.1 |
+
+A second epoch added nothing measurable (+0.6 [−0.9, +2.2]). The hand check found ~5% label noise in nuImages (reflections in shop windows labelled as vehicles), concentrated in single-object grounding questions.
+
 ### Reproduce
 
 ```bash

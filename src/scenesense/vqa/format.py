@@ -31,7 +31,9 @@ def to_qwen_box(box, w, h):
 def target(row):
     """The answer text the model is trained to produce."""
     if family(row["type"]) == "ground":
-        return "<|box_start|>" + to_qwen_box(row["box"], row["width"], row["height"]) + "<|box_end|>"
+        m = re.match(r"Where is (the .+?)\?", row["question"])
+        ref = f"<|object_ref_start|>{m.group(1)}<|object_ref_end|>" if m else ""
+        return ref + "<|box_start|>" + to_qwen_box(row["box"], row["width"], row["height"]) + "<|box_end|>"
     return row["answer"]
 
 
