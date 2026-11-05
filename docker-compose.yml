@@ -1,0 +1,85 @@
+# scenesense: VLM (vLLM) + agent LLM (vLLM) + API.
+#   docker compose up -d        -> API on http://localhost:8080 (/health, /ask, /vqa, /count)
+# Uses the same ports as the tmux setup (8001, 8002), so run one or the other.
+# The LLM starts only after the VLM is healthy: vLLM checks that FREE memory >= utilisation x total
+# at startup, so starting both at once can fail with "Free memory ... is less than desired GPU memory utilization".
+# GPU budget on a 32 GB card: VLM 0.25 + LLM 0.60.
+
+x-gpu: &gpu
+  deploy:
+    resources:
+      reservations:
+        devices:
+          - driver: nvidia
+            count: all
+            capabilities: [gpu]
+
+x-vllm-health: &vllm-health
+  interval: 15s
+  timeout: 5s
+  retries: 5
+  start_period: 600s   # first start downloads weights and captures CUDA graphs
+
+services:
+  vlm:
+    image: vllm/vllm-openai:v0.33.0
+    <<: *gpu
+    ipc: host
+    entrypoint: ["vllm", "serve"]
+    command:
+      - /models/scenesense-vlm
+      - --served-model-name=scenesense-vlm
+      - --max-model-len=4096
+      - '--limit-mm-per-prompt={"image": 1}'
+      - '--mm-processor-kwargs={"min_pixels": 200704, "max_pixels": 802816}'   # must match training
+      - --gpu-memory-utilization=0.25
+      - --port=8001
+    volumes:
+      - ./runs/qwen2vl2b_merged:/models/scenesense-vlm:ro      # merged LoRA model (not in git)
+      - ${HF_HOME:-~/.cache/huggingface}:/root/.cache/huggingface
+    ports: ["8001:8001"]
+    healthcheck:
+      <<: *vllm-health
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/v1/models')"]
+
+  llm:
+    image: vllm/vllm-openai:v0.33.0
+    <<: *gpu
+    ipc: host
+    entrypoint: ["vllm", "serve"]
+    command:
+      - Qwen/Qwen2.5-14B-Instruct-AWQ
+      - --served-model-name=agent-llm
+      - --max-model-len=8192
+      - --gpu-memory-utilization=0.60
+      - --enable-auto-tool-choice
+      - --tool-call-parser=hermes
+      - --port=8002
+    volumes:
+      - ${HF_HOME:-~/.cache/huggingface}:/root/.cache/huggingface
+    ports: ["8002:8002"]
+    depends_on:
+      vlm: {condition: service_healthy}
+    healthcheck:
+      <<: *vllm-health
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8002/v1/models')"]
+
+  api:
+    build: {context: ., dockerfile: docker/api.Dockerfile}
+    environment:
+      SCENESENSE_VLM_URL: http://vlm:8001/v1
+      SCENESENSE_LLM_URL: http://llm:8002/v1
+    volumes:
+      - ./data/tracks:/app/data/tracks:ro          # tracking event logs
+      - ./data/nuscenes:/app/data/nuscenes:ro      # nuScenes mini (frames + metadata)
+      - ./data/chroma:/app/data/chroma             # Chroma window index (sqlite needs write access)
+      - ${HF_HOME:-~/.cache/huggingface}:/root/.cache/huggingface   # bge-small embedder
+    ports: ["8080:8080"]
+    depends_on:
+      vlm: {condition: service_healthy}
+      llm: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5

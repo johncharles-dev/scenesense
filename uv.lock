@@ -3131,6 +3131,15 @@ wheels = [
 ]
 
 [[package]]
+name = "python-multipart"
+version = "0.0.33"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/9f/b7/15b905f6142a9a8a68f66900788da1a32e4d4254452783b37ad1eccb0506/python_multipart-0.0.33.tar.gz", hash = "sha256:b8112424a6abd162ec08d390565dd113ad699f2fe6fef3c987b8bbcbfe9e390d", size = 50499, upload-time = "2026-10-31T14:23:47.461Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/dd/1b/6b1b4164ec734cac911460ab599bfbe46afedd42c5c9627fe4235942c314/python_multipart-0.0.33-py3-none-any.whl", hash = "sha256:8f16c07b36add9da6b2ee87d3efcaf0a45a6de9c3d0a5dd94e9ccf7675a7bc45", size = 32253, upload-time = "2026-10-31T14:23:46.33Z" },
+]
+
+[[package]]
 name = "pytz"
 version = "2026.5"
 source = { registry = "https://pypi.org/simple" }
@@ -3392,6 +3401,7 @@ source = { editable = "." }
 dependencies = [
     { name = "accelerate" },
     { name = "chromadb" },
+    { name = "fastapi" },
     { name = "faster-coco-eval" },
     { name = "lap" },
     { name = "ml-dtypes" },
@@ -3404,6 +3414,7 @@ dependencies = [
     { name = "peft" },
     { name = "pillow" },
     { name = "pycocotools" },
+    { name = "python-multipart" },
     { name = "pyyaml" },
     { name = "sentence-transformers" },
     { name = "supervision" },
@@ -3413,6 +3424,7 @@ dependencies = [
     { name = "tqdm" },
     { name = "transformers" },
     { name = "ultralytics" },
+    { name = "uvicorn" },
 ]
 
 [package.dev-dependencies]
@@ -3425,6 +3437,7 @@ dev = [
 requires-dist = [
     { name = "accelerate", specifier = ">=1.15.0" },
     { name = "chromadb", specifier = ">=1.5.9" },
+    { name = "fastapi", specifier = ">=0.162.0" },
     { name = "faster-coco-eval", specifier = ">=1.8.0" },
     { name = "lap", specifier = ">=0.5.13" },
     { name = "ml-dtypes", specifier = ">=0.5" },
@@ -3437,6 +3450,7 @@ requires-dist = [
     { name = "peft", specifier = ">=0.21.2" },
     { name = "pillow", specifier = ">=13.0.0" },
     { name = "pycocotools", specifier = ">=2.0.11" },
+    { name = "python-multipart", specifier = ">=0.0.33" },
     { name = "pyyaml", specifier = ">=6.0.3" },
     { name = "sentence-transformers", specifier = ">=6.2.0" },
     { name = "supervision", specifier = ">=0.31.2" },
@@ -3446,6 +3460,7 @@ requires-dist = [
     { name = "tqdm", specifier = ">=4.70.1" },
     { name = "transformers", specifier = ">=5.20.2" },
     { name = "ultralytics", specifier = ">=8.4.190" },
+    { name = "uvicorn", specifier = ">=0.54.0" },
 ]
 
 [package.metadata.requires-dev]

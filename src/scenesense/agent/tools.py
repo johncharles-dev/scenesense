@@ -218,24 +218,32 @@ def question_family(question):
         "'Where is the <object>? Give its bounding box.'")
 
 
-def ask_vlm(scene, t, question):
+def vlm_on_image(image_bytes, question, width, height, mime="image/jpeg"):
+    """Ask the VLM one trained-form question about an image. Shared by ask_vlm and the /vqa endpoint."""
     fam, q = question_family(question)
     if fam == "ground" and not q.lower().endswith("give its bounding box."):
         q += " Give its bounding box."
-    fr = get_frame(scene, t)
-    b64 = base64.b64encode(Path(fr["image"]).read_bytes()).decode()
+    b64 = base64.b64encode(image_bytes).decode()
     resp = _vlm_client().chat.completions.create(
         model=VLM_MODEL, temperature=0, max_tokens=32,
         messages=[{"role": "user", "content": [
-            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}},
+            {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}},
             {"type": "text", "text": f"{q} {INSTRUCT[fam]}"}]}])
     answer = (resp.choices[0].message.content or "").strip()
-    out = {"scene": fr["scene"], "frame": fr["frame"], "t": fr["t"], "question": q, "answer": answer}
+    out = {"question": q, "question_type": fam, "answer": answer}
     if fam == "ground":                                   # only expose pixels, not Qwen's 0-1000 grid
-        box = parse_box(answer, fr["width"], fr["height"])
+        box = parse_box(answer, width, height)
         out["answer"] = [round(v) for v in box] if box else "no box returned"
-        out["answer_format"] = f"[x1, y1, x2, y2] in pixels of a {fr['width']}x{fr['height']} image"
+        out["answer_format"] = f"[x1, y1, x2, y2] in pixels of a {width}x{height} image"
     return out
+
+
+def ask_vlm(scene, t, question):
+    question_family(question)                             # validate before touching the frame
+    fr = get_frame(scene, t)
+    res = vlm_on_image(Path(fr["image"]).read_bytes(), question, fr["width"], fr["height"])
+    res.pop("question_type")
+    return {"scene": fr["scene"], "frame": fr["frame"], "t": fr["t"], **res}
 
 
 FUNCS = {"list_scenes": list_scenes, "search": search, "count": count,
