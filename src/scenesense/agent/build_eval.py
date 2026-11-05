@@ -13,6 +13,7 @@ from pathlib import Path
 from scenesense.agent.index import WINDOW, scene_meta
 
 OUT = Path("data/agent_eval/questions.jsonl")
+UPSTREAM_OUT = Path("data/agent_eval/upstream.jsonl")
 PLURAL = {"car": "cars", "truck": "trucks", "bus": "buses", "trailer": "trailers",
           "construction_vehicle": "construction vehicles", "motorcycle": "motorcycles", "bicycle": "bicycles",
           "pedestrian": "pedestrians", "traffic_cone": "traffic cones", "barrier": "barriers"}
@@ -46,6 +47,15 @@ MOMENTS = [
     ("Find a moment in a Boston parking lot with a bus.", "parking lot", "boston-seaport", None, "bus"),
     ("Find a moment near construction in One North where a traffic cone is visible.", "construction",
      "singapore-onenorth", None, "traffic_cone"),
+]
+
+# Known upstream failures: the scene description says the object is there, but the detector/tracker never
+# found it, so no tool can confirm it. Kept as a separate set (not dropped) so the main set is not made easier.
+# (question, scene whose description mentions it, class, description phrase)
+UPSTREAM = [
+    ("Find a moment in a parking lot where a bicycle is visible.", "scene-0916", "bicycle", "parked bicycles"),
+    ("Find a night moment where a construction vehicle is present.", "scene-1077", "construction_vehicle",
+     "construction vehicle"),
 ]
 
 UNANSWERABLE = [
@@ -174,7 +184,27 @@ def build(seed=0):
     return qs
 
 
+def build_upstream():
+    """Truth from the scene description (any window of that scene); the tracker has zero tracks of the class."""
+    ev, meta = load_events(), scene_meta()
+    out = []
+    for i, (q, scene, cls, phrase) in enumerate(UPSTREAM):
+        assert phrase in meta[scene]["description"].lower(), (scene, phrase)
+        assert not any(e["class"] == cls for e in ev[scene]), (scene, cls)
+        n_win = int(max(e["t"] for e in ev[scene]) // WINDOW) + 1
+        out.append({"id": 100 + i, "type": "upstream", "question": q, "scenes": [scene],
+                    "answer": [[scene, w * WINDOW, (w + 1) * WINDOW] for w in range(n_win)],
+                    "reason": f"description of {scene} says '{phrase}' but the tracker has 0 {cls} tracks"})
+    return out
+
+
 def main():
+    up = build_upstream()
+    UPSTREAM_OUT.parent.mkdir(parents=True, exist_ok=True)
+    with open(UPSTREAM_OUT, "w") as f:
+        for q in up:
+            f.write(json.dumps(q) + "\n")
+    print(f"{len(up)} upstream-failure questions -> {UPSTREAM_OUT}")
     qs = build()
     OUT.parent.mkdir(parents=True, exist_ok=True)
     with open(OUT, "w") as f:

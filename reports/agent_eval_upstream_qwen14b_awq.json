@@ -1,0 +1,58 @@
+{
+  "name": "upstream_qwen14b_awq",
+  "served_model": "Qwen/Qwen2.5-14B-Instruct-AWQ",
+  "answer_accuracy": {
+    "mean": 1.0,
+    "lo": 1.0,
+    "hi": 1.0,
+    "n": 2
+  },
+  "refusal_on_unanswerable": null,
+  "false_refusal_on_answerable": {
+    "mean": 0.0,
+    "lo": 0.0,
+    "hi": 0.0,
+    "n": 2
+  },
+  "citation_present": {
+    "mean": 1.0,
+    "lo": 1.0,
+    "hi": 1.0,
+    "n": 2
+  },
+  "citation_with_time": {
+    "mean": 1.0,
+    "lo": 1.0,
+    "hi": 1.0,
+    "n": 2
+  },
+  "citation_correct": {
+    "mean": 0.5,
+    "lo": 0.0,
+    "hi": 1.0,
+    "n": 2
+  },
+  "citation_log_supported": {
+    "mean": 0.0,
+    "lo": 0.0,
+    "hi": 0.0,
+    "n": 2
+  },
+  "tool_call_validity": {
+    "mean": 1.0,
+    "lo": 1.0,
+    "hi": 1.0,
+    "n": 2
+  },
+  "tool_calls_total": 6,
+  "tool_calls_schema_errors": 0,
+  "mean_steps": 3.0,
+  "mean_latency_s": 3.21,
+  "p50_latency_s": 3.21,
+  "by_type": {
+    "upstream": {
+      "correct": 2,
+      "n": 2
+    }
+  }
+}

@@ -68,6 +68,53 @@ RT-DETR's lead holds in every slice and roughly doubles at night. The night slic
 
 A second epoch added nothing measurable (+0.6 [−0.9, +2.2]). The hand check found ~5% label noise in nuImages (reflections in shop windows labelled as vehicles), concentrated in single-object grounding questions.
 
+## Results — scene-query agent
+
+An LLM agent answers questions about the 10 nuScenes-mini scenes with a hand-written tool-calling loop (OpenAI-compatible API on vLLM, no framework). Facts come from tools: `count` computes distinct track IDs from the tracking log (per scene, or per-scene breakdown + total + argmax over a location / day-night set); `search` retrieves 2-second windows from Chroma to find moments; `ask_vlm` sends a frame to the fine-tuned VLM using only its four trained question forms and ten classes. Every claim cites `(scene, time)`.
+
+**Eval set.** 51 held-out questions, written before either model ran on them and excluding the 7 dev questions used while building the agent: count 10, total 5, compare 10, find-a-moment 8, VQA on a frame 8, grounding 1, unanswerable 9. Truth for counts, comparisons and moments is computed from the tracking logs by `scenesense.agent.build_eval`; VQA items use the tracker as reference at frames also checked by eye. Scoring is rule-based (unit-tested regexes) with a full hand audit. One run per model at temperature 0, same frozen prompt and tools; 95% bootstrap CIs over questions, paired for the difference.
+
+| Metric | Qwen2.5-7B bf16 | Qwen2.5-14B-AWQ | Paired diff (14B − 7B) |
+|---|---|---|---|
+| Answer accuracy, answerable (n=42) | 97.6% [92.9, 100] | 92.9% [85.7, 100] | −4.8 [−11.9, 0.0] |
+| Correct refusal, unanswerable (n=9) | 55.6% [22.2, 88.9] | 100% | +44.4 [+11.1, +77.8] |
+| Citation includes a time | 45.2% [31.0, 59.5] | 95.2% [88.1, 100] | +50.0 [+35.7, +64.3] |
+| Citation supported by the log (class present/absent in that scene within ±1 s, as claimed) | 40.5% [26.2, 54.8] | 88.1% [78.6, 97.6] | +47.6 [+28.6, +64.3] |
+| Tool calls that parse and run | 93.8% (61/65) | 95.2% (59/62) | — |
+| Known upstream failures (n=2): names the described scene / claim supported by any tool | 2/2 / 0/2 | 2/2 / 0/2 | — |
+| Latency p50 / mean | 0.68 s / 0.79 s | 0.64 s / 0.94 s | — |
+
+The 7B model is slightly better on answerable questions, but the difference is not significant (n=42; the CI's upper bound is exactly 0; it is two find-a-moment questions where the 14B checked the VLM, got "no" on a night frame and hedged). The 14B model is clearly better on refusals and on citations that the log actually supports. **We use Qwen2.5-14B-Instruct-AWQ**: for an agent, a confident wrong answer costs more than a refusal. The 7B answered "How many cars are in the Paris scenes?" with Queenstown's count (85) and turned "dogs" (not a tracked class) into "there are no dogs"; the 14B refused all 9 unanswerable questions. Both fit the same 0.60 GPU-memory budget. All failed tool calls were intended validation rejections (unknown class or scene, time outside the scene); none were malformed. Answerable questions are mostly easy *by design*: one `count` call returns the breakdown and argmax, so the discriminating part is refusal and citation discipline. The hand audit disagreed with the rule-based citation-support check once (a 14B answer that names a scene where the log has no bicycle, then hedges "not consistently visible"); audited, the 14B figure is 36/42.
+
+**Moved out of the main set: known upstream failures.** Two questions were moved out of the main set because the detector/tracker never found the object, so no tool can confirm it: "parked bicycles" in scene-0916 and a "construction vehicle" in scene-1077 appear in the scene descriptions but have zero tracks. They are reported in their own row rather than dropped, because dropping hard cases would make the main set look easier than it is. Both models name the right scene (from the description) in 2/2, but for the wrong reasons: neither claim is supported by tool output, and the 14B's only "evidence" for the construction vehicle was a VLM count of 1 on a frame where none is visible (checked by eye).
+
+**Failure analysis.**
+- *An error passed on from one stage to the next:* in scene-1100 at 8 s the VLM answers "yes" to "Is there a truck in the image?". The tracker has no truck anywhere in that scene, and none is visible in the frame (checked by eye). Both agents faithfully report "there is a truck" with a correct-looking citation. The agent did its job and the claim is still false: an agent is only as reliable as its weakest tool, and nothing in the loop cross-checks the VLM against the tracker.
+- Place substitution (7B): unknown places ("Paris") answered with a real location's data.
+- Unknown class turned into zero (7B): "Unknown object class 'dog'" became "there are no dogs".
+- Behaviour stated as fact (7B): "9 pedestrians crossed" with no proxy label.
+- Tracker vs VLM disagreement on moments (both): the tracker has a motorcycle in a window, the VLM says "no" on the sampled frames (small or distant objects, night).
+- Retrieval: the window text embeds the per-scene description plus the classes present, so retrieval works at scene level and only refines by class within a scene.
+
+```bash
+uv run python -m scenesense.agent.index                 # Chroma window index
+uv run python -m scenesense.agent.build_eval            # 51 questions + 2 upstream-failure questions
+uv run python -m scenesense.agent.loop "Which of the Boston scenes has the fewest buses?"
+uv run python -m scenesense.agent.eval_agent run --name qwen14b_awq
+uv run python -m scenesense.agent.eval_agent run --name upstream_qwen14b_awq --questions data/agent_eval/upstream.jsonl
+uv run python -m scenesense.agent.eval_agent compare qwen7b qwen14b_awq
+```
+
+Serving (VLM on :8001, agent LLM on :8002):
+
+```bash
+vllm serve runs/qwen2vl2b_merged --served-model-name scenesense-vlm --max-model-len 4096 \
+    --limit-mm-per-prompt '{"image": 1}' --mm-processor-kwargs '{"min_pixels": 200704, "max_pixels": 802816}' \
+    --gpu-memory-utilization 0.25 --port 8001
+vllm serve Qwen/Qwen2.5-14B-Instruct-AWQ --served-model-name agent-llm --max-model-len 8192 \
+    --gpu-memory-utilization 0.60 --enable-auto-tool-choice --tool-call-parser hermes --port 8002
+```
+
 ### Reproduce
 
 ```bash

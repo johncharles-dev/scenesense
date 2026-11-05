@@ -36,6 +36,11 @@ def sentences(text):
     return [s for s in re.split(r"(?<=[.!?])\s+|\n+", text) if s.strip()]
 
 
+def _times(text):
+    ranges = [(float(a), float(b)) for a, b in TIME_RANGE.findall(text)]
+    return ranges or [(float(a), float(a)) for a in TIME_POINT.findall(TIME_RANGE.sub(" ", text))]
+
+
 def citations(text):
     """(scene, t0, t1) for each scene mention; times are taken from the same sentence (t0=t1=None if none)."""
     out = []
@@ -43,13 +48,85 @@ def citations(text):
         scenes = SCENE.findall(s)
         if not scenes:
             continue
-        rest = SCENE.sub(" ", s)
-        ranges = [(float(a), float(b)) for a, b in TIME_RANGE.findall(rest)]
-        if not ranges:
-            ranges = [(float(a), float(a)) for a in TIME_POINT.findall(TIME_RANGE.sub(" ", rest))]
+        ranges = _times(SCENE.sub(" ", s))
         for sc in scenes:
             out += [(sc, a, b) for a, b in ranges] or [(sc, None, None)]
     return out
+
+
+# ---------- citation support against the tracking log ----------
+
+CLASS_PHRASES = {"traffic cone": "traffic_cone", "construction vehicle": "construction_vehicle",
+                 "pedestrian": "pedestrian", "motorcycle": "motorcycle", "bicycle": "bicycle", "trailer": "trailer",
+                 "barrier": "barrier", "truck": "truck", "bus": "bus", "car": "car"}
+NEGATION = re.compile(r"\b(no|not|none|zero|0|isn't|aren't|absent)\b", re.I)
+
+
+def question_class(question):
+    """The object class a question is about (longest phrase first, so 'traffic cone' wins over 'car')."""
+    q = question.lower()
+    for phrase in sorted(CLASS_PHRASES, key=len, reverse=True):
+        if re.search(rf"\b{phrase}(e?s)?\b", q):
+            return CLASS_PHRASES[phrase]
+    return None
+
+
+def claims(text):
+    """(scene, t0, t1, present) per scene mention.
+
+    Polarity: the context of a mention is the text between the nearest mentions of a DIFFERENT scene in the
+    same sentence, so 'scene A has no X, whereas scene B has 10' gives A absent, B present, and a repeated
+    '(scene A, 0-19 s)' shares A's context. A bare citation such as '(scene-0757, 5-10 s)' with no words around
+    it inherits the last claim made about that scene. Times come from the text after the mention (up to the
+    next one), else from the sentence if it has exactly one time; t0=None if the mention has no time."""
+    out, last = [], {}
+    for s in sentences(text):
+        ms = list(SCENE.finditer(s))
+        for i, m in enumerate(ms):
+            j = i
+            while j > 0 and ms[j - 1].group() == m.group():
+                j -= 1
+            k = i
+            while k + 1 < len(ms) and ms[k + 1].group() == m.group():
+                k += 1
+            ctx = s[ms[j - 1].end() if j else 0: ms[k + 1].start() if k + 1 < len(ms) else len(s)]
+            stripped = TIME_POINT.sub(" ", TIME_RANGE.sub(" ", SCENE.sub(" ", ctx)))
+            if re.search(r"[a-z]{2,}", stripped, re.I):
+                present = not NEGATION.search(stripped)
+            else:
+                present = last.get(m.group(), True)
+            last[m.group()] = present
+            after = s[m.end(): ms[i + 1].start() if i + 1 < len(ms) else len(s)]
+            sent_times = _times(SCENE.sub(" ", s))
+            times = _times(after) or (sent_times if len(sent_times) == 1 else [])
+            out += [(m.group(), a, b, present) for a, b in times] or [(m.group(), None, None, present)]
+    return out
+
+
+def log_supported(q, answer, events):
+    """True if the answer has >=1 time-stamped citation and, for every one, the log agrees with the claim:
+    the question's class has (or, for a negative claim, has no) track in that scene within +-1 s of the time."""
+    cls = question_class(q["question"])
+    timed = [c for c in claims(answer) if c[1] is not None]
+    if cls is None or not timed:
+        return False
+    for sc, a, b, present in timed:
+        if sc not in events:
+            return False
+        seen = any(e["class"] == cls and a - 1 <= e["t"] <= b + 1 for e in events[sc])
+        if seen != present:
+            return False
+    return True
+
+
+_EVENTS = {}
+
+
+def tracking_events():
+    if not _EVENTS:
+        for p in sorted(Path("data/tracks").glob("scene-*.jsonl")):
+            _EVENTS[p.stem] = [json.loads(line) for line in open(p)]
+    return _EVENTS
 
 
 def numbers(text):
@@ -107,7 +184,7 @@ def correct(q, answer):
                 any(sc in q["scenes"] for sc in SCENE.findall(s))]
         named = [sc for sc in SCENE.findall(comp[-1] if comp else answer) if sc in q["scenes"]]
         return bool(named) and named[0] == truth
-    if typ == "moment":
+    if typ in ("moment", "upstream"):
         return any(overlaps(c, truth) for c in citations(answer))
     if typ == "vqa":
         return yes_no(answer) == truth
@@ -124,7 +201,7 @@ def citation_ok(q, answer):
         return False, False
     if any(sc not in q["scenes"] for sc, _, _ in cits):
         return True, False
-    if q["type"] == "moment":
+    if q["type"] in ("moment", "upstream"):
         return True, all(overlaps(c, q["answer"]) for c in cits)
     if q["type"] in ("vqa", "ground"):
         return True, any(a is not None and a - 1 <= q["t"] <= b + 1 for _, a, b in cits)
@@ -135,9 +212,12 @@ def score(q, pred):
     ans = pred.get("answer") or ""
     calls = pred.get("trace", [])
     present, cit = citation_ok(q, ans) if q["type"] != "unanswerable" else (None, None)
-    timed = any(a is not None for _, a, _ in citations(ans)) if q["type"] != "unanswerable" else None
+    answerable = q["type"] != "unanswerable"
+    timed = any(a is not None for _, a, _ in citations(ans)) if answerable else None
+    supported = log_supported(q, ans, tracking_events()) if answerable else None
     return {"correct": correct(q, ans), "refused": bool(REFUSAL.search(ans)),
             "citation_present": present, "citation_with_time": timed, "citation_correct": cit,
+            "citation_log_supported": supported,
             "n_calls": len(calls), "n_ok": sum(c["ok"] for c in calls),
             "n_parse_err": sum(not c["ok"] and not str(c["result"].get("error", "")).startswith("ValueError")
                                for c in calls)}
@@ -147,6 +227,8 @@ def score(q, pred):
 
 def bootstrap(values, n=10_000, seed=0, weights=None):
     """Mean (or ratio of sums with weights) and 95% percentile CI, resampling questions."""
+    if len(values) == 0:
+        return None
     v = np.asarray(values, float)
     w = np.ones_like(v) if weights is None else np.asarray(weights, float)
     rng = np.random.default_rng(seed)
@@ -167,6 +249,7 @@ def summarize(qs, rows):
         "citation_present": bootstrap([r["s"]["citation_present"] for r in ans]),
         "citation_with_time": bootstrap([r["s"]["citation_with_time"] for r in ans]),
         "citation_correct": bootstrap([r["s"]["citation_correct"] for r in ans]),
+        "citation_log_supported": bootstrap([r["s"]["citation_log_supported"] for r in ans]),
         "tool_call_validity": bootstrap([r["s"]["n_ok"] for r in rows], weights=[r["s"]["n_calls"] for r in rows]),
         "tool_calls_total": int(sum(r["s"]["n_calls"] for r in rows)),
         "tool_calls_schema_errors": int(sum(r["s"]["n_parse_err"] for r in rows)),
@@ -197,12 +280,12 @@ def paired(qs, a_rows, b_rows, metric, subset):
 
 # ---------- CLI ----------
 
-def run_all(name, max_steps=8):
+def run_all(name, max_steps=8, questions=QUESTIONS):
     import openai
 
     from scenesense.agent.loop import LLM_URL, run
 
-    qs = [json.loads(line) for line in open(QUESTIONS)]
+    qs = [json.loads(line) for line in open(questions)]
     served = openai.OpenAI(base_url=LLM_URL, api_key="none").models.list().data[0].root
     rows = []
     for q in qs:
@@ -244,7 +327,8 @@ def compare(a, b):
                "refusal_on_unanswerable": paired(qs, ra, rb, "correct", lambda q: not answerable(q)),
                "all_questions": paired(qs, ra, rb, "correct", lambda q: True),
                "citation_correct": paired(qs, ra, rb, "citation_correct", answerable),
-               "citation_with_time": paired(qs, ra, rb, "citation_with_time", answerable)}}
+               "citation_with_time": paired(qs, ra, rb, "citation_with_time", answerable),
+               "citation_log_supported": paired(qs, ra, rb, "citation_log_supported", answerable)}}
     Path(f"reports/agent_eval_{b}_vs_{a}.json").write_text(json.dumps(out, indent=2))
     print(json.dumps(out[f"{b}_minus_{a}"], indent=1))
 
@@ -255,12 +339,13 @@ def main():
     r = sub.add_parser("run")
     r.add_argument("--name", required=True)
     r.add_argument("--max-steps", type=int, default=8)
+    r.add_argument("--questions", default=str(QUESTIONS))
     c = sub.add_parser("compare")
     c.add_argument("a")
     c.add_argument("b")
     a = ap.parse_args()
     if a.cmd == "run":
-        run_all(a.name, a.max_steps)
+        run_all(a.name, a.max_steps, Path(a.questions))
     else:
         compare(a.a, a.b)
 

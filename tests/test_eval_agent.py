@@ -1,5 +1,6 @@
 """Rule-based agent scorer: parsing and per-type correctness on hand-written answers."""
-from scenesense.agent.eval_agent import bootstrap, citation_ok, citations, correct, numbers, yes_no
+from scenesense.agent.eval_agent import (bootstrap, citation_ok, citations, claims, correct, log_supported,
+                                          numbers, question_class, yes_no)
 
 COUNT = {"type": "count", "answer": 78, "scenes": ["scene-1077"]}
 ZERO = {"type": "count", "answer": 0, "scenes": ["scene-0103"]}
@@ -65,3 +66,30 @@ def test_bootstrap_mean_and_ratio():
     r = bootstrap([1, 0, 1, 1])
     assert r["mean"] == 0.75 and r["lo"] <= 0.75 <= r["hi"]
     assert bootstrap([2, 3], weights=[2, 4])["mean"] == 5 / 6
+
+
+def test_claims_split_polarity_per_scene():
+    c = claims("In scene-0796, no barriers are tracked (scene-0796, 0-19.6 s), whereas in scene-1077, "
+               "10 barriers are tracked (scene-1077, 0-19.95 s).")
+    timed = [(sc, present) for sc, a, _, present in c if a is not None]
+    assert timed == [("scene-0796", False), ("scene-1077", True)]
+    assert question_class("Are more traffic cones tracked in scene-0103?") == "traffic_cone"
+    assert question_class("How many construction vehicles are tracked?") == "construction_vehicle"
+
+
+def test_log_supported():
+    events = {"scene-0001": [{"class": "bus", "t": 5.0}], "scene-0002": []}
+    q = {"type": "vqa", "question": "Is there a bus in scene-0001 at 5 seconds?"}
+    assert log_supported(q, "Yes, there is a bus (scene-0001, 5 s).", events)
+    assert log_supported(q, "There is a bus at 5.8 s in scene-0001.", events)        # within +-1 s
+    assert not log_supported(q, "There is a bus (scene-0001, 9 s).", events)         # no bus near 9 s
+    assert not log_supported(q, "There is no bus (scene-0001, 5 s).", events)        # contradicts log
+    assert log_supported(q, "There is no bus (scene-0002, 5 s).", events)
+    assert not log_supported(q, "There is a bus in scene-0001.", events)              # no time: unverifiable
+
+
+def test_claims_repeated_and_bare_citations_keep_polarity():
+    c = claims("There are 0 buses tracked in scene-0103 (scene-0103, 0-19.4 s).")
+    assert [p for _, a, _, p in c if a is not None] == [False, False]
+    c = claims("No construction vehicles appear in scene-0757 between 5 and 10 seconds. (scene-0757, 5-10 s)")
+    assert [p for _, a, _, p in c if a is not None] == [False, False]      # the bare citation inherits "no"
