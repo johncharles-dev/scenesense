@@ -17,6 +17,7 @@ dependencies = [
     "nvidia-modelopt[onnx]>=0.44",
     "onnx>=1.19.0",
     "onnxslim>=0.1.98",
+    "openai>=3.46.0",
     "peft>=0.21.2",
     "pillow>=13.0.0",
     "pycocotools>=2.0.11",
