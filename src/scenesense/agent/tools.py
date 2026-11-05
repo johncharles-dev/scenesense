@@ -133,9 +133,20 @@ def search(query, location=None, night=None, k=5):
             for i, (m, d) in enumerate(zip(r["metadatas"][0], r["distances"][0]))]
 
 
+def _duration(scene):
+    return max(e["t"] for e in _events(scene))
+
+
+def check_time(scene, t):
+    """Times must lie inside the scene (all scenes are ~20 s); out-of-range is an error, not an empty answer."""
+    if not -0.5 <= t <= _duration(scene) + 0.5:
+        raise ValueError(f"t={t} s is outside {scene}, which runs from 0 to {_duration(scene):.1f} s.")
+    return t
+
+
 def _count_one(scene, cls, t_start, t_end):
     ids = {e["track_id"] for e in _events(scene) if e["class"] == cls and t_start <= e["t"] <= t_end}
-    duration = max(e["t"] for e in _events(scene))
+    duration = _duration(scene)
     return {"scene": scene, "t_start": t_start, "t_end": min(t_end, duration), "count": len(ids)}
 
 
@@ -148,6 +159,9 @@ def count(object_class, scene=None, location=None, night=None, t_start=0, t_end=
     if scene is not None:
         if location is not None or night is not None:
             raise ValueError("Give either scene or location/night filters, not both.")
+        scene = check_scene(scene)
+        if t_start > 0:
+            check_time(scene, t_start)
         return {"object_class": cls, **_count_one(check_scene(scene), cls, t_start, t_end),
                 "note": ID_SWITCH_NOTE}
     if location is not None:
@@ -165,7 +179,8 @@ def count(object_class, scene=None, location=None, night=None, t_start=0, t_end=
 
 
 def get_frame(scene, t):
-    scene, t = check_scene(scene), float(t)
+    scene = check_scene(scene)
+    t = check_time(scene, float(t))
     frames = _frames(scene)
     t0 = frames[0]["timestamp"]
     i = min(range(len(frames)), key=lambda j: abs((frames[j]["timestamp"] - t0) / 1e6 - t))

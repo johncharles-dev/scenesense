@@ -1,0 +1,206 @@
+{
+  "a": "qwen7b",
+  "b": "qwen14b_awq",
+  "summary": {
+    "qwen7b": {
+      "answer_accuracy": {
+        "mean": 0.9761904761904762,
+        "lo": 0.9285714285714286,
+        "hi": 1.0,
+        "n": 42
+      },
+      "refusal_on_unanswerable": {
+        "mean": 0.5555555555555556,
+        "lo": 0.2222222222222222,
+        "hi": 0.8888888888888888,
+        "n": 9
+      },
+      "false_refusal_on_answerable": {
+        "mean": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "n": 42
+      },
+      "citation_present": {
+        "mean": 1.0,
+        "lo": 1.0,
+        "hi": 1.0,
+        "n": 42
+      },
+      "citation_with_time": {
+        "mean": 0.4523809523809524,
+        "lo": 0.30952380952380953,
+        "hi": 0.5952380952380952,
+        "n": 42
+      },
+      "citation_correct": {
+        "mean": 0.9761904761904762,
+        "lo": 0.9285714285714286,
+        "hi": 1.0,
+        "n": 42
+      },
+      "tool_call_validity": {
+        "mean": 0.9384615384615385,
+        "lo": 0.8709677419354839,
+        "hi": 0.9857142857142858,
+        "n": 51
+      },
+      "tool_calls_total": 65,
+      "tool_calls_schema_errors": 0,
+      "mean_steps": 2.2549019607843137,
+      "mean_latency_s": 0.7898039215686273,
+      "p50_latency_s": 0.68,
+      "by_type": {
+        "compare": {
+          "correct": 10,
+          "n": 10
+        },
+        "count": {
+          "correct": 10,
+          "n": 10
+        },
+        "ground": {
+          "correct": 1,
+          "n": 1
+        },
+        "moment": {
+          "correct": 8,
+          "n": 8
+        },
+        "total": {
+          "correct": 5,
+          "n": 5
+        },
+        "unanswerable": {
+          "correct": 5,
+          "n": 9
+        },
+        "vqa": {
+          "correct": 7,
+          "n": 8
+        }
+      }
+    },
+    "qwen14b_awq": {
+      "answer_accuracy": {
+        "mean": 0.9285714285714286,
+        "lo": 0.8571428571428571,
+        "hi": 1.0,
+        "n": 42
+      },
+      "refusal_on_unanswerable": {
+        "mean": 1.0,
+        "lo": 1.0,
+        "hi": 1.0,
+        "n": 9
+      },
+      "false_refusal_on_answerable": {
+        "mean": 0.0,
+        "lo": 0.0,
+        "hi": 0.0,
+        "n": 42
+      },
+      "citation_present": {
+        "mean": 1.0,
+        "lo": 1.0,
+        "hi": 1.0,
+        "n": 42
+      },
+      "citation_with_time": {
+        "mean": 0.9523809523809523,
+        "lo": 0.8809523809523809,
+        "hi": 1.0,
+        "n": 42
+      },
+      "citation_correct": {
+        "mean": 0.9523809523809523,
+        "lo": 0.8809523809523809,
+        "hi": 1.0,
+        "n": 42
+      },
+      "tool_call_validity": {
+        "mean": 0.9516129032258065,
+        "lo": 0.8923076923076924,
+        "hi": 1.0,
+        "n": 51
+      },
+      "tool_calls_total": 62,
+      "tool_calls_schema_errors": 0,
+      "mean_steps": 2.0392156862745097,
+      "mean_latency_s": 0.9356862745098039,
+      "p50_latency_s": 0.64,
+      "by_type": {
+        "compare": {
+          "correct": 10,
+          "n": 10
+        },
+        "count": {
+          "correct": 10,
+          "n": 10
+        },
+        "ground": {
+          "correct": 1,
+          "n": 1
+        },
+        "moment": {
+          "correct": 6,
+          "n": 8
+        },
+        "total": {
+          "correct": 5,
+          "n": 5
+        },
+        "unanswerable": {
+          "correct": 9,
+          "n": 9
+        },
+        "vqa": {
+          "correct": 7,
+          "n": 8
+        }
+      }
+    }
+  },
+  "qwen14b_awq_minus_qwen7b": {
+    "answer_accuracy": {
+      "diff": -0.047619047619047616,
+      "lo": -0.11904761904761904,
+      "hi": 0.0,
+      "n": 42,
+      "b_only": 0,
+      "a_only": 2
+    },
+    "refusal_on_unanswerable": {
+      "diff": 0.4444444444444444,
+      "lo": 0.1111111111111111,
+      "hi": 0.7777777777777778,
+      "n": 9,
+      "b_only": 4,
+      "a_only": 0
+    },
+    "all_questions": {
+      "diff": 0.0392156862745098,
+      "lo": -0.058823529411764705,
+      "hi": 0.13725490196078433,
+      "n": 51,
+      "b_only": 4,
+      "a_only": 2
+    },
+    "citation_correct": {
+      "diff": -0.023809523809523808,
+      "lo": -0.11904761904761904,
+      "hi": 0.047619047619047616,
+      "n": 42,
+      "b_only": 1,
+      "a_only": 2
+    },
+    "citation_with_time": {
+      "diff": 0.5,
+      "lo": 0.35714285714285715,
+      "hi": 0.6428571428571429,
+      "n": 42,
+      "b_only": 21,
+      "a_only": 0
+    }
+  }
+}

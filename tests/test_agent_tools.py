@@ -52,6 +52,8 @@ def test_count_rejects_bad_arguments(fake_logs):
         tools.count("tree", scene="scene-0001")
     with pytest.raises(ValueError, match="before t_start"):
         tools.count("car", scene="scene-0001", t_start=5, t_end=1)
+    with pytest.raises(ValueError, match="outside scene-0001"):
+        tools.count("car", scene="scene-0001", t_start=45, t_end=50)
     with pytest.raises(ValueError, match="not both"):
         tools.count("car", scene="scene-0001", location="loc-a")
 

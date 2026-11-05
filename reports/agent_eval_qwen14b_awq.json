@@ -1,0 +1,125 @@
+{
+  "name": "qwen14b_awq",
+  "served_model": "Qwen/Qwen2.5-14B-Instruct-AWQ",
+  "answer_accuracy": {
+    "mean": 0.9285714285714286,
+    "lo": 0.8571428571428571,
+    "hi": 1.0,
+    "n": 42
+  },
+  "refusal_on_unanswerable": {
+    "mean": 1.0,
+    "lo": 1.0,
+    "hi": 1.0,
+    "n": 9
+  },
+  "false_refusal_on_answerable": {
+    "mean": 0.0,
+    "lo": 0.0,
+    "hi": 0.0,
+    "n": 42
+  },
+  "citation_present": {
+    "mean": 1.0,
+    "lo": 1.0,
+    "hi": 1.0,
+    "n": 42
+  },
+  "citation_with_time": {
+    "mean": 0.9523809523809523,
+    "lo": 0.8809523809523809,
+    "hi": 1.0,
+    "n": 42
+  },
+  "citation_correct": {
+    "mean": 0.9523809523809523,
+    "lo": 0.8809523809523809,
+    "hi": 1.0,
+    "n": 42
+  },
+  "tool_call_validity": {
+    "mean": 0.9516129032258065,
+    "lo": 0.8923076923076924,
+    "hi": 1.0,
+    "n": 51
+  },
+  "tool_calls_total": 62,
+  "tool_calls_schema_errors": 0,
+  "mean_steps": 2.0392156862745097,
+  "mean_latency_s": 0.9356862745098039,
+  "p50_latency_s": 0.64,
+  "by_type": {
+    "compare": {
+      "correct": 10,
+      "n": 10
+    },
+    "count": {
+      "correct": 10,
+      "n": 10
+    },
+    "ground": {
+      "correct": 1,
+      "n": 1
+    },
+    "moment": {
+      "correct": 6,
+      "n": 8
+    },
+    "total": {
+      "correct": 5,
+      "n": 5
+    },
+    "unanswerable": {
+      "correct": 9,
+      "n": 9
+    },
+    "vqa": {
+      "correct": 7,
+      "n": 8
+    }
+  },
+  "scorer_v1_before_audit_fix": {
+    "answer_accuracy": {
+      "mean": 0.8809523809523809,
+      "lo": 0.7857142857142857,
+      "hi": 0.9761904761904762,
+      "n": 42
+    },
+    "refusal_on_unanswerable": {
+      "mean": 0.8888888888888888,
+      "lo": 0.6666666666666666,
+      "hi": 1.0,
+      "n": 9
+    },
+    "by_type": {
+      "compare": {
+        "correct": 8,
+        "n": 10
+      },
+      "count": {
+        "correct": 10,
+        "n": 10
+      },
+      "ground": {
+        "correct": 1,
+        "n": 1
+      },
+      "moment": {
+        "correct": 6,
+        "n": 8
+      },
+      "total": {
+        "correct": 5,
+        "n": 5
+      },
+      "unanswerable": {
+        "correct": 8,
+        "n": 9
+      },
+      "vqa": {
+        "correct": 7,
+        "n": 8
+      }
+    }
+  }
+}
