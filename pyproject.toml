@@ -9,6 +9,7 @@ authors = [
 requires-python = ">=3.11,<3.13"
 dependencies = [
     "accelerate>=1.15.0",
+    "chromadb>=1.5.9",
     "faster-coco-eval>=1.8.0",
     "lap>=0.5.13",
     "ml-dtypes>=0.5",
@@ -22,6 +23,7 @@ dependencies = [
     "pillow>=13.0.0",
     "pycocotools>=2.0.11",
     "pyyaml>=6.0.3",
+    "sentence-transformers>=6.2.0",
     "supervision>=0.31.2",
     "tensorrt-cu13>=11.4.0.106",
     "torch>=2.14.1",
