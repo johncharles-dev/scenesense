@@ -11,8 +11,8 @@ WINDOW = 2.0
 EMBEDDER = "BAAI/bge-small-en-v1.5"
 
 
-def scene_meta():
-    nusc = NuScenes(version="v1.0-mini", dataroot="data/nuscenes", verbose=False)
+def scene_meta(nusc=None):
+    nusc = nusc or NuScenes(version="v1.0-mini", dataroot="data/nuscenes", verbose=False)
     meta = {}
     for s in nusc.scene:
         log = nusc.get("log", s["log_token"])
@@ -30,15 +30,18 @@ def window_docs(events, meta):
     docs = []
     for (scene, w), by_cls in sorted(tracks.items()):
         m, t0 = meta[scene], w * WINDOW
-        parts = [f"{len(ids)} {c}{'s' if len(ids) > 1 else ''} (ids {', '.join(map(str, sorted(ids)))})"
-                 for c, ids in sorted(by_cls.items(), key=lambda kv: -len(kv[1]))]
-        text = (f"{scene}, {m['location']}, {'night' if m['night'] else 'day'}, "
-                f"t={t0:.0f}-{t0 + WINDOW:.0f}s: " + "; ".join(parts) + f". Scene: {m['description']}")
+        # Embedded text: description, place, day/night and classes present. No IDs or counts: they are
+        # noise for semantic matching (and counts are answered exactly by the count tool, not retrieval).
+        present = sorted(by_cls, key=lambda c: -len(by_cls[c]))
+        text = (f"{m['description']}. {m['location'].replace('-', ' ')}, {'night' if m['night'] else 'day'}. "
+                f"Objects: {', '.join(c.replace('_', ' ') for c in present)}.")
         fr = sorted(frames[(scene, w)])
         docs.append({"id": f"{scene}_{w:03d}", "text": text,
                      "meta": {"scene": scene, "location": m["location"], "night": m["night"],
                               "t_start": t0, "t_end": t0 + WINDOW, "frame": fr[len(fr) // 2],
-                              "classes": ",".join(sorted(by_cls))}})
+                              "classes": ",".join(sorted(by_cls)),
+                              "counts": json.dumps({c: len(ids) for c, ids in sorted(by_cls.items())}),
+                              "track_ids": json.dumps({c: sorted(ids) for c, ids in sorted(by_cls.items())})}})
     return docs
 
 
