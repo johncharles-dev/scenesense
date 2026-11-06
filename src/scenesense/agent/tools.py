@@ -7,7 +7,7 @@ import base64
 import json
 import os
 import re
-from functools import lru_cache
+from functools import cache, lru_cache
 from pathlib import Path
 
 from scenesense.agent.index import EMBEDDER, scene_meta
@@ -30,7 +30,7 @@ ID_SWITCH_NOTE = ("Counts are distinct track IDs; ID switches (~7% of tracks) ca
 
 # ---------- cached resources ----------
 
-@lru_cache(maxsize=None)
+@cache
 def _events(scene):
     path = TRACKS_DIR / f"{scene}.jsonl"
     return [json.loads(line) for line in open(path)]
@@ -63,7 +63,7 @@ def _embedder():
     return SentenceTransformer(EMBEDDER, device="cpu")   # GPU belongs to the vLLM servers
 
 
-@lru_cache(maxsize=None)
+@cache
 def _frames(scene):
     from scenesense.track.run_tracking import scene_frames
     nusc = _nusc()
@@ -192,11 +192,11 @@ def get_frame(scene, t):
 # The question forms the VLM was fine-tuned on (scenesense.vqa.build_vqa) -> instruction family.
 # Named groups capture the object(s), which must be one of the 10 trained classes.
 QUESTION_FORMS = [
-    ("count", re.compile(r"^how many (?P<a>[\w\s-]+?) (are )?in the image\?$", re.I)),
-    ("exists", re.compile(r"^is there an? (?P<a>[\w\s-]+) in the image\?$", re.I)),
-    ("left_right", re.compile(r"^is the (?P<a>[\w\s-]+) to the left or right of the (?P<b>[\w\s-]+)\?$", re.I)),
+    ("count", re.compile(r"^how many (?P<a>[\w\s-]+?) (are )?in the image\?$", re.IGNORECASE)),
+    ("exists", re.compile(r"^is there an? (?P<a>[\w\s-]+) in the image\?$", re.IGNORECASE)),
+    ("left_right", re.compile(r"^is the (?P<a>[\w\s-]+) to the left or right of the (?P<b>[\w\s-]+)\?$", re.IGNORECASE)),
     ("ground", re.compile(r"^where is the (?:(?:leftmost|rightmost|largest|smallest|nearest) )?"
-                          r"(?P<a>[\w\s-]+?)\?( give its bounding box\.)?$", re.I)),
+                          r"(?P<a>[\w\s-]+?)\?( give its bounding box\.)?$", re.IGNORECASE)),
 ]
 
 

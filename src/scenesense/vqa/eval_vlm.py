@@ -10,6 +10,7 @@ from PIL import Image
 from tqdm import tqdm
 from transformers import AutoProcessor, Qwen2VLForConditionalGeneration
 
+from scenesense.utils import read_jsonl
 from scenesense.vqa.format import family, prompt, score
 
 MIN_PIXELS, MAX_PIXELS = 256 * 28 * 28, 1024 * 28 * 28     # ~1,000 visual tokens per 1600x900 image
@@ -71,8 +72,8 @@ def main():
         model = PeftModel.from_pretrained(model, a.adapter)
     model.eval()
 
-    rows = [json.loads(l) for l in open(a.vqa)][: a.limit]
-    verified = {(r["image_id"], r["question"]) for r in map(json.loads, open(a.verified))} \
+    rows = read_jsonl(a.vqa)[: a.limit]
+    verified = {(r["image_id"], r["question"]) for r in read_jsonl(a.verified)} \
         if Path(a.verified).exists() else set()
     preds = []
     for i in tqdm(range(0, len(rows), a.batch), desc="vqa"):
@@ -90,8 +91,7 @@ def main():
 
     Path("data/preds").mkdir(parents=True, exist_ok=True)
     with open(f"data/preds/vqa_{a.name}.jsonl", "w") as f:
-        for p in preds:
-            f.write(json.dumps(p) + "\n")
+        f.writelines(json.dumps(p) + "\n" for p in preds)
     summary = report(preds, verified, a.name)
     Path("reports").mkdir(exist_ok=True)
     Path(f"reports/vqa_{a.name}.json").write_text(json.dumps(summary, indent=2))

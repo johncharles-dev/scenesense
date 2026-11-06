@@ -11,7 +11,7 @@ Built on [nuImages](https://www.nuscenes.org/nuimages) and nuScenes (Singapore a
 | Stage | Result |
 |---|---|
 | Detection (nuImages val) | RT-DETR fine-tuned **0.477 mAP** [0.470, 0.483], +0.304 over zero-shot |
-| Speed (RTX 5090) | YOLO11s TensorRT fp16 **0.62 ms** / image (3.1× over PyTorch fp16); RT-DETR fp16 7.0 ms |
+| Speed (RTX 5090) | YOLO11s TensorRT fp16 **0.62 ms** / image (3.1× over PyTorch fp16, mAP change −0.0006 [−0.0015, +0.0005]); RT-DETR fp16 7.0 ms |
 | Tracking (nuScenes mini) | 1,116 tracks, 33,665 events over 10 scenes |
 | Grounded VQA (Qwen2-VL-2B) | LoRA **59.0% → 75.1%** (+16.1 [+13.9, +18.6]) |
 | Serving (vLLM) | bf16 135 ms single-user, 18 req/s at concurrency 32; AWQ rejected (grounding drop) |
@@ -91,11 +91,16 @@ Median of 200 timed iterations after 30 warm-up runs, measured with CUDA events.
 | YOLO11s | PyTorch | fp16 | 1.94 ms | 2,092 img/s |
 | **YOLO11s** | **TensorRT** | **fp16** | **0.62 ms** | **5,410 img/s** |
 
-TensorRT fp16 makes YOLO11s 3.1× faster than PyTorch fp16 at batch 1 (2.6× at batch 16), with no measurable mAP loss. This is the accuracy/speed trade-off: RT-DETR is +0.072 mAP better but ~11× slower than YOLO11s on TensorRT, so the offline pipeline here (tracking, logs) uses RT-DETR, and YOLO11s + TensorRT is the option for a real-time, on-vehicle budget.
+TensorRT fp16 makes YOLO11s 3.1× faster than PyTorch fp16 at batch 1 (2.6× at batch 16). Accuracy is unchanged within the CI: on the full val set the fp16 engine scores 0.404 [0.399, 0.409] mAP against 0.404 [0.400, 0.410] for PyTorch, a paired difference (TensorRT − PyTorch) of **−0.0006 [−0.0015, +0.0005]** (200 image-level bootstrap resamples, `reports/yolo11s_trt_vs_pytorch.json`). The comparison is end to end, so it also includes a preprocessing difference: the batch-1 engine sees a fixed 640×640 letterbox, while the PyTorch run used Ultralytics' default rectangular batches. This is the accuracy/speed trade-off: RT-DETR is +0.072 mAP better but ~11× slower than YOLO11s on TensorRT, so the offline pipeline here (tracking, logs) uses RT-DETR, and YOLO11s + TensorRT is the option for a real-time, on-vehicle budget.
 
 ```bash
 uv run python scripts/bench_latency.py                                   # reports/latency_pytorch.json
 uv run python scripts/bench_trt.py yolo11s=<engine> yolo11s_b16=<engine>  # reports/latency_trt.json
+uv run yolo detect val data=data/yolo/nuimages.yaml model=runs/yolo11s_ft/weights/yolo11s_fp16_b1.engine imgsz=640 batch=1 \
+    conf=0.001 half=True save_json=True plots=False project=$PWD/runs name=yolo11s_trt_b1_val
+cp runs/yolo11s_trt_b1_val/predictions.json data/preds/yolo11s_trt_fp16_b1_val.json
+uv run python -m scenesense.eval.map_ci --gt data/coco/val.json --pred data/preds/yolo11s_ft_val.json \
+    --pred data/preds/yolo11s_trt_fp16_b1_val.json --n-boot 200 --out reports/yolo11s_trt_vs_pytorch.json
 ```
 
 ## Results — tracking (nuScenes mini, 10 scenes)
@@ -138,7 +143,7 @@ The LoRA adapter is merged into the base model and served with vLLM (OpenAI-comp
 | Single-user latency p50 (100 requests) | 135 ms | 114 ms |
 | Throughput at concurrency 32 | 18.0 req/s | 18.1 req/s |
 
-vLLM bf16 matches the Hugging Face evaluation within noise (74.4% vs 75.1%). AWQ cuts size by 43% and single-user latency by about 16%, but grounding drops 3.6–5.6 points with paired CIs that exclude 0, and throughput does not improve because image preprocessing on the CPU is the bottleneck at concurrency 32. **Decision: keep bf16.** The 2B model fits easily at bf16 (0.25 of the GPU), so the memory saving buys nothing here, and box grounding is the output the agent relies on.
+vLLM bf16 matches the Hugging Face evaluation within noise (74.4% vs 75.1%). AWQ cuts size by 43% and single-user latency by about 15% (p50 135 → 114 ms), but grounding drops 3.6–5.6 points with paired CIs that exclude 0, and throughput does not improve because image preprocessing on the CPU is the bottleneck at concurrency 32. **Decision: keep bf16.** The 2B model fits easily at bf16 (0.25 of the GPU), so the memory saving buys nothing here, and box grounding is the output the agent relies on.
 
 ```bash
 uv run python scripts/merge_lora.py runs/qwen2vl2b_lora/adapter runs/qwen2vl2b_merged
@@ -189,7 +194,7 @@ A: In the moment you asked for, there is 1 bus in the image (scene-0757, 16-18 s
 | Metric | Qwen2.5-7B bf16 | Qwen2.5-14B-AWQ | Paired diff (14B − 7B) |
 |---|---|---|---|
 | Answer accuracy, answerable (n=42) | 97.6% [92.9, 100] | 92.9% [85.7, 100] | −4.8 [−11.9, 0.0] |
-| Correct refusal, unanswerable (n=9) | 55.6% [22.2, 88.9] | 100% | +44.4 [+11.1, +77.8] |
+| Correct refusal, unanswerable (n=9) | 55.6% [22.2, 88.9] | 100%² | +44.4 [+11.1, +77.8] |
 | Citation includes a time | 45.2% [31.0, 59.5] | 95.2% [88.1, 100] | +50.0 [+35.7, +64.3] |
 | Citation supported by the log (class present/absent in that scene within ±1 s, as claimed), hand-audited | 40.5% [26.2, 54.8] (17/42) | 85.7% [73.8, 95.2] (36/42)¹ | +45.2 [+26.2, +64.3] |
 | Tool calls that parse and run | 93.8% (61/65) | 95.2% (59/62) | — |
@@ -197,6 +202,8 @@ A: In the moment you asked for, there is 1 bus in the image (scene-0757, 16-18 s
 | Latency p50 / mean | 0.68 s / 0.79 s | 0.64 s / 0.94 s | — |
 
 ¹ The automated rule-based check gives 37/42 (88.1% [78.6, 97.6]; paired diff +47.6 [+28.6, +64.3]). The hand audit disagreed once: a 14B answer names a scene where the log has no bicycle and then hedges "not consistently visible", which the rule read as supported. Both versions are in `reports/agent_eval_citation_audit.json`.
+
+² 1 of 9 refusals also stated an ungrounded count (8 vs 9 in the log), with no tool call. The refusal itself was right, so it is scored correct, but it is not fully clean (see the failure analysis).
 
 The 7B model is slightly better on answerable questions, but the difference is not significant (n=42; the CI's upper bound is exactly 0; it is two find-a-moment questions where the 14B checked the VLM, got "no" on a night frame and hedged). The 14B model is clearly better on refusals and on citations that the log actually supports. **We use Qwen2.5-14B-Instruct-AWQ**: for an agent, a confident wrong answer costs more than a refusal. The 7B answered "How many cars are in the Paris scenes?" with Queenstown's count (85) and turned "dogs" (not a tracked class) into "there are no dogs"; the 14B refused all 9 unanswerable questions. Both fit the same 0.60 GPU-memory budget. All failed tool calls were intended validation rejections (unknown class or scene, time outside the scene); none were malformed. Answerable questions are mostly easy *by design*: one `count` call returns the breakdown and argmax, so the discriminating part is refusal and citation discipline.
 

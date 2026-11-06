@@ -14,6 +14,8 @@ from pathlib import Path
 
 import numpy as np
 
+from scenesense.utils import read_jsonl
+
 QUESTIONS = Path("data/agent_eval/questions.jsonl")
 SCENE = re.compile(r"scene-\d{4}")
 NUM = r"\d+(?:\.\d+)?"
@@ -26,8 +28,8 @@ REFUSAL = re.compile(
     r"not (?:in|part of) the (?:logs|data|tools|available)|does not exist|doesn't exist|not one of|"
     r"not tracked|isn't tracked|are not tracked|outside|only (?:runs|lasts|covers)|not included|no such|"
     r"not a valid|invalid|not supported|not listed|no scenes?\b|"
-    r"(?:do|does) not (?:measure|provide|track|include|contain)", re.I)
-COMPARATIVE = re.compile(r"\b(more|most|fewer|fewest|less|least|higher|highest|lower|lowest|greater)\b", re.I)
+    r"(?:do|does) not (?:measure|provide|track|include|contain)", re.IGNORECASE)
+COMPARATIVE = re.compile(r"\b(more|most|fewer|fewest|less|least|higher|highest|lower|lowest|greater)\b", re.IGNORECASE)
 
 
 # ---------- parsing ----------
@@ -59,7 +61,7 @@ def citations(text):
 CLASS_PHRASES = {"traffic cone": "traffic_cone", "construction vehicle": "construction_vehicle",
                  "pedestrian": "pedestrian", "motorcycle": "motorcycle", "bicycle": "bicycle", "trailer": "trailer",
                  "barrier": "barrier", "truck": "truck", "bus": "bus", "car": "car"}
-NEGATION = re.compile(r"\b(no|not|none|zero|0|isn't|aren't|absent)\b", re.I)
+NEGATION = re.compile(r"\b(no|not|none|zero|0|isn't|aren't|absent)\b", re.IGNORECASE)
 
 
 def question_class(question):
@@ -91,7 +93,7 @@ def claims(text):
                 k += 1
             ctx = s[ms[j - 1].end() if j else 0: ms[k + 1].start() if k + 1 < len(ms) else len(s)]
             stripped = TIME_POINT.sub(" ", TIME_RANGE.sub(" ", SCENE.sub(" ", ctx)))
-            if re.search(r"[a-z]{2,}", stripped, re.I):
+            if re.search(r"[a-z]{2,}", stripped, re.IGNORECASE):
                 present = not NEGATION.search(stripped)
             else:
                 present = last.get(m.group(), True)
@@ -125,7 +127,7 @@ _EVENTS = {}
 def tracking_events():
     if not _EVENTS:
         for p in sorted(Path("data/tracks").glob("scene-*.jsonl")):
-            _EVENTS[p.stem] = [json.loads(line) for line in open(p)]
+            _EVENTS[p.stem] = read_jsonl(p)
     return _EVENTS
 
 
@@ -136,7 +138,7 @@ def numbers(text):
     t = TIME_POINT.sub(" ", t)
     t = re.sub(r"\d+\s*x\s*\d+|\[[^\]]*\]|~?\d+\s*%", " ", t)
     nums = [int(float(n)) for n in re.findall(NUM, t)]
-    nums += [v for w, v in WORDS.items() if re.search(rf"\b{w}\b", t, re.I)]
+    nums += [v for w, v in WORDS.items() if re.search(rf"\b{w}\b", t, re.IGNORECASE)]
     return nums
 
 
@@ -174,7 +176,7 @@ def correct(q, answer):
     if typ == "unanswerable":
         return bool(REFUSAL.search(answer))
     if typ in ("count", "total"):
-        if truth == 0 and re.search(r"\b(no|none|zero|not any)\b", answer, re.I):
+        if truth == 0 and re.search(r"\b(no|none|zero|not any)\b", answer, re.IGNORECASE):
             return True
         return truth in numbers(answer)
     if typ == "compare":
@@ -235,7 +237,7 @@ def bootstrap(values, n=10_000, seed=0, weights=None):
     idx = rng.integers(0, len(v), (n, len(v)))
     stats = (v[idx]).sum(1) / np.maximum(w[idx].sum(1), 1e-9)
     return {"mean": float(v.sum() / w.sum()), "lo": float(np.percentile(stats, 2.5)),
-            "hi": float(np.percentile(stats, 97.5)), "n": int(len(v))}
+            "hi": float(np.percentile(stats, 97.5)), "n": len(v)}
 
 
 def summarize(qs, rows):
@@ -285,14 +287,14 @@ def run_all(name, max_steps=8, questions=QUESTIONS):
 
     from scenesense.agent.loop import LLM_URL, run
 
-    qs = [json.loads(line) for line in open(questions)]
+    qs = read_jsonl(questions)
     served = openai.OpenAI(base_url=LLM_URL, api_key="none").models.list().data[0].root
     rows = []
     for q in qs:
         t0 = time.perf_counter()
         try:
             pred = run(q["question"], max_steps=max_steps, verbose=False)
-        except Exception as e:                       # server error: count as a wrong, empty answer
+        except Exception as e:  # noqa: BLE001  server error: count as a wrong, empty answer
             pred = {"answer": "", "trace": [], "steps": 0, "latency_s": time.perf_counter() - t0,
                     "error": f"{type(e).__name__}: {e}"}
         row = {"id": q["id"], "type": q["type"], "question": q["question"], "truth": q["answer"],
@@ -303,8 +305,7 @@ def run_all(name, max_steps=8, questions=QUESTIONS):
               f"{row['steps']} steps {row['latency_s']:.1f}s | {(row['answer'] or '')[:110]}")
     Path("data/preds").mkdir(exist_ok=True)
     with open(f"data/preds/agent_eval_{name}.jsonl", "w") as f:
-        for r in rows:
-            f.write(json.dumps(r, default=str) + "\n")
+        f.writelines(json.dumps(r, default=str) + "\n" for r in rows)
     summary = {"name": name, "served_model": served, **summarize(qs, rows)}
     Path(f"reports/agent_eval_{name}.json").write_text(json.dumps(summary, indent=2))
     print(json.dumps({k: v for k, v in summary.items() if k != "by_type"}, indent=1))
@@ -312,14 +313,14 @@ def run_all(name, max_steps=8, questions=QUESTIONS):
 
 
 def compare(a, b):
-    qs = [json.loads(line) for line in open(QUESTIONS)]
-    load = lambda n: [json.loads(line) for line in open(f"data/preds/agent_eval_{n}.jsonl")]  # noqa: E731
+    qs = read_jsonl(QUESTIONS)
+    load = lambda n: read_jsonl(f"data/preds/agent_eval_{n}.jsonl")
     ra, rb = load(a), load(b)
     for rows in (ra, rb):                            # rescore with the current rules
         by_id = {q["id"]: q for q in qs}
         for r in rows:
             r["s"] = score(by_id[r["id"]], r)
-    answerable = lambda q: q["type"] != "unanswerable"  # noqa: E731
+    answerable = lambda q: q["type"] != "unanswerable"
     out = {"a": a, "b": b,
            "summary": {a: summarize(qs, ra), b: summarize(qs, rb)},
            f"{b}_minus_{a}": {

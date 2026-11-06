@@ -1,6 +1,5 @@
 """Fine-tune RT-DETR on nuImages (COCO format) with the Hugging Face Trainer."""
 import argparse
-import json
 import os
 import random
 from pathlib import Path
@@ -8,9 +7,15 @@ from pathlib import Path
 import torch
 from PIL import Image
 from torch.utils.data import Dataset
-from transformers import RTDetrForObjectDetection, RTDetrImageProcessor, Trainer, TrainingArguments
+from transformers import (
+    RTDetrForObjectDetection,
+    RTDetrImageProcessor,
+    Trainer,
+    TrainingArguments,
+)
 
 from scenesense.data.nuimages_to_coco import CLASSES
+from scenesense.utils import read_json
 
 ID2LABEL = {i: c for i, c in enumerate(CLASSES)}   # model label i  <->  COCO category_id i+1
 LABEL2ID = {c: i for i, c in ID2LABEL.items()}
@@ -18,7 +23,7 @@ LABEL2ID = {c: i for i, c in ID2LABEL.items()}
 
 class CocoDetection(Dataset):
     def __init__(self, gt_path, images_root, processor, limit=None, train=True):
-        d = json.load(open(gt_path))
+        d = read_json(gt_path)
         self.images = d["images"][:limit] if limit else d["images"]
         self.anns = {}
         for a in d["annotations"]:

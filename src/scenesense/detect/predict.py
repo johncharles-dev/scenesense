@@ -1,6 +1,5 @@
 """Run an RT-DETR checkpoint over a COCO image list and write COCO-format predictions."""
 import argparse
-import json
 from pathlib import Path
 
 import torch
@@ -9,6 +8,7 @@ from tqdm import tqdm
 from transformers import RTDetrForObjectDetection, RTDetrImageProcessor
 
 from scenesense.data.nuimages_to_coco import CLASS_ID
+from scenesense.utils import read_json, write_json
 
 # Pretrained COCO label -> our class, for the zero-shot baseline (only 6 of our 10 classes exist in COCO)
 COCO_TO_OURS = {"car": "car", "truck": "truck", "bus": "bus", "motorbike": "motorcycle",
@@ -17,7 +17,7 @@ COCO_TO_OURS = {"car": "car", "truck": "truck", "bus": "bus", "motorbike": "moto
 
 @torch.no_grad()
 def predict(gt_path, images_root, model_name, out_path, zero_shot, batch=16, limit=None, threshold=0.01):
-    gt = json.load(open(gt_path))
+    gt = read_json(gt_path)
     images = gt["images"][:limit] if limit else gt["images"]
     device = "cuda"
     proc = RTDetrImageProcessor.from_pretrained(model_name)
@@ -45,7 +45,7 @@ def predict(gt_path, images_root, model_name, out_path, zero_shot, batch=16, lim
                                 "bbox": [x1, y1, x2 - x1, y2 - y1], "score": score})
 
     Path(out_path).parent.mkdir(parents=True, exist_ok=True)
-    json.dump(results, open(out_path, "w"))
+    write_json(results, out_path)
     print(f"{len(images)} images, {len(results)} detections -> {out_path}")
 
 

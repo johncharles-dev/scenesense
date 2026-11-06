@@ -57,14 +57,14 @@ def call_tool(name, raw_args):
     try:
         args = json.loads(raw_args or "{}")
         if not isinstance(args, dict):
-            raise ValueError("arguments must be a JSON object")
-    except (json.JSONDecodeError, ValueError) as e:
+            raise TypeError("arguments must be a JSON object")
+    except (json.JSONDecodeError, TypeError) as e:
         return {"error": f"Could not parse arguments {raw_args!r}: {e}"}, False
     try:
         return FUNCS[name](**args), True
     except TypeError as e:                                # missing / unexpected argument names
         return {"error": f"Bad arguments for {name}: {e}"}, False
-    except Exception as e:                                # ValueError from validation, server errors, ...
+    except Exception as e:  # noqa: BLE001  ValueError from validation, server errors, ...
         return {"error": f"{type(e).__name__}: {e}"}, False
 
 

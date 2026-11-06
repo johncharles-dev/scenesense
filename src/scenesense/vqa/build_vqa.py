@@ -5,6 +5,8 @@ import random
 from collections import Counter, defaultdict
 from pathlib import Path
 
+from scenesense.utils import read_json
+
 MIN_AREA = 32 * 32                       # COCO 'medium' and above: big enough to see
 NAMES = {"car": "car", "truck": "truck", "bus": "bus", "trailer": "trailer",
          "construction_vehicle": "construction vehicle", "motorcycle": "motorcycle",
@@ -73,7 +75,7 @@ def candidates(im, anns, cats, rng, ref_rng):
 def build(gt_path, out_path, per_type, seed):
     rng = random.Random(seed)
     ref_rng = random.Random(seed + 1)
-    d = json.load(open(gt_path))
+    d = read_json(gt_path)
     cats = {c["id"]: c["name"] for c in d["categories"]}
     anns = defaultdict(list)
     for a in d["annotations"]:

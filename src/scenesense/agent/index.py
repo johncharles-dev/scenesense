@@ -7,6 +7,8 @@ import chromadb
 from nuscenes.nuscenes import NuScenes
 from sentence_transformers import SentenceTransformer
 
+from scenesense.utils import read_jsonl
+
 WINDOW = 2.0
 EMBEDDER = "BAAI/bge-small-en-v1.5"
 
@@ -46,7 +48,7 @@ def window_docs(events, meta):
 
 
 def main():
-    events = [json.loads(l) for p in sorted(glob.glob("data/tracks/scene-*.jsonl")) for l in open(p)]
+    events = [e for p in sorted(glob.glob("data/tracks/scene-*.jsonl")) for e in read_jsonl(p)]
     docs = window_docs(events, scene_meta())
     model = SentenceTransformer(EMBEDDER)
     emb = model.encode([d["text"] for d in docs], normalize_embeddings=True).tolist()

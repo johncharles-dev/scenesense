@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from scenesense.agent import tools
+from scenesense.utils import read_jsonl
 
 
 def _ev(track_id, cls, t, scene="scene-0001"):
@@ -100,7 +101,7 @@ def test_question_family_rejects_untrained_classes():
 @pytest.mark.skipif(not Path("data/vqa/val.jsonl").exists(), reason="VQA set not present")
 def test_question_family_accepts_every_training_template():
     from scenesense.vqa.format import family
-    rows = [json.loads(line) for line in open("data/vqa/val.jsonl")]
+    rows = read_jsonl("data/vqa/val.jsonl")
     for r in rows:
         assert tools.question_family(r["question"])[0] == family(r["type"]), r["question"]
 
@@ -112,6 +113,6 @@ def test_tool_schemas_match_functions():
 
 @pytest.mark.skipif(not Path("data/tracks/scene-0796.jsonl").exists(), reason="tracking logs not present")
 def test_count_matches_raw_log():
-    events = [json.loads(line) for line in open("data/tracks/scene-0796.jsonl")]
+    events = read_jsonl("data/tracks/scene-0796.jsonl")
     truth = len({e["track_id"] for e in events if e["class"] == "bus"})
     assert tools.count("bus", scene="scene-0796")["count"] == truth

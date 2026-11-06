@@ -1,5 +1,6 @@
 """Merge a LoRA adapter into Qwen2-VL-2B and save a standalone model for serving."""
 import sys
+
 import torch
 from peft import PeftModel
 from transformers import AutoProcessor, Qwen2VLForConditionalGeneration

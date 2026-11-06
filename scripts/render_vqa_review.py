@@ -1,13 +1,13 @@
 """Render VQA questions with their ground-truth evidence drawn, for a hand check."""
 import argparse
 import csv
-import json
 import re
 from collections import defaultdict
 from pathlib import Path
 
 import cv2
 
+from scenesense.utils import read_json, read_jsonl
 from scenesense.vqa.build_vqa import NAMES, PLURAL
 
 FONT = cv2.FONT_HERSHEY_SIMPLEX
@@ -32,13 +32,13 @@ def main():
     ap.add_argument("--out", default="data/vqa/review")
     a = ap.parse_args()
 
-    rows = [json.loads(l) for l in open(a.vqa)]
+    rows = read_jsonl(a.vqa)
     by_type = defaultdict(list)
     for r in rows:
         by_type[r["type"].split("_")[0]].append(r)            # count, exists, ground, left
     sample = [r for v in by_type.values() for r in v[: a.n // len(by_type)]]
 
-    gt = json.load(open(a.gt))
+    gt = read_json(a.gt)
     cats = {c["id"]: c["name"] for c in gt["categories"]}
     anns = defaultdict(list)
     for x in gt["annotations"]:

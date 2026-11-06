@@ -1,9 +1,9 @@
-from nuimages import NuImages
-from collections import Counter, defaultdict
 import json
-from pathlib import Path
+from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
+from nuimages import NuImages
 
 # nuImages fine class -> nuScenes detection class (10). Anything missing is dropped.
 CLASS_MAP = {

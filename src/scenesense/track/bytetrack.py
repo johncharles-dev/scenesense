@@ -21,7 +21,8 @@ class _Dets:
 
 
 class ByteTrack:
-    def __init__(self, frame_rate=12, high=0.25, low=0.1, new=0.25, buffer=30, match=0.8):
+    def __init__(self, high=0.25, low=0.1, new=0.25, buffer=30, match=0.8):
+        # buffer counts frames (BYTETracker keeps a lost track this many frames): 30 = 2.5 s at 12 Hz
         args = SimpleNamespace(tracker_type="bytetrack", track_high_thresh=high, track_low_thresh=low,
                                new_track_thresh=new, track_buffer=buffer, match_thresh=match, fuse_score=True)
         self.tracker = BYTETracker(args)

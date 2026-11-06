@@ -9,6 +9,7 @@ from pathlib import Path
 import numpy as np
 from openai import AsyncOpenAI
 
+from scenesense.utils import read_jsonl, write_jsonl
 from scenesense.vqa.eval_vlm import report
 from scenesense.vqa.format import prompt, score
 
@@ -40,8 +41,8 @@ async def main():
     a = ap.parse_args()
 
     client = AsyncOpenAI(base_url=a.url, api_key="none")
-    rows = [json.loads(l) for l in open(a.vqa)][: a.limit]
-    verified = {(r["image_id"], r["question"]) for r in map(json.loads, open(a.verified))}
+    rows = read_jsonl(a.vqa)[: a.limit]
+    verified = {(r["image_id"], r["question"]) for r in read_jsonl(a.verified)}
     sem = asyncio.Semaphore(a.concurrency)
     t0 = time.perf_counter()
     preds = await asyncio.gather(*(ask(client, a.model, r, a.images_root, sem) for r in rows))
@@ -51,9 +52,7 @@ async def main():
           f"latency p50 {np.median(lat) * 1000:.0f} ms, p95 {np.percentile(lat, 95) * 1000:.0f} ms "
           f"(concurrency {a.concurrency})")
     summary = report(preds, verified, a.name)
-    with open(f"data/preds/vqa_{a.name}.jsonl", "w") as f:
-        for p in preds:
-            f.write(json.dumps(p) + "\n")
+    write_jsonl(preds, f"data/preds/vqa_{a.name}.jsonl")
     summary["speed"] = {"req_per_s": len(preds) / wall, "p50_ms": float(np.median(lat) * 1000),
                         "p95_ms": float(np.percentile(lat, 95) * 1000), "concurrency": a.concurrency}
     Path(f"reports/vqa_{a.name}.json").write_text(json.dumps(summary, indent=2))

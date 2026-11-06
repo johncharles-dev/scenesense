@@ -11,6 +11,7 @@ from collections import defaultdict
 from pathlib import Path
 
 from scenesense.agent.index import WINDOW, scene_meta
+from scenesense.utils import read_jsonl
 
 OUT = Path("data/agent_eval/questions.jsonl")
 UPSTREAM_OUT = Path("data/agent_eval/upstream.jsonl")
@@ -74,8 +75,7 @@ UNANSWERABLE = [
 def load_events():
     ev = defaultdict(list)
     for p in sorted(glob.glob("data/tracks/scene-*.jsonl")):
-        for line in open(p):
-            e = json.loads(line)
+        for e in read_jsonl(p):
             ev[e["scene"]].append(e)
     return ev
 
@@ -202,14 +202,12 @@ def main():
     up = build_upstream()
     UPSTREAM_OUT.parent.mkdir(parents=True, exist_ok=True)
     with open(UPSTREAM_OUT, "w") as f:
-        for q in up:
-            f.write(json.dumps(q) + "\n")
+        f.writelines(json.dumps(q) + "\n" for q in up)
     print(f"{len(up)} upstream-failure questions -> {UPSTREAM_OUT}")
     qs = build()
     OUT.parent.mkdir(parents=True, exist_ok=True)
     with open(OUT, "w") as f:
-        for q in qs:
-            f.write(json.dumps(q) + "\n")
+        f.writelines(json.dumps(q) + "\n" for q in qs)
     by = defaultdict(int)
     for q in qs:
         by[q["type"]] += 1

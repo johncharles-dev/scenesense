@@ -1,5 +1,4 @@
 """AWQ 4-bit (W4A16) quantisation of the merged Qwen2-VL with llm-compressor, calibrated on our VQA train set."""
-import json
 import sys
 
 import torch
@@ -9,12 +8,13 @@ from llmcompressor.modifiers.awq import AWQModifier
 from PIL import Image
 from transformers import AutoProcessor, Qwen2VLForConditionalGeneration
 
+from scenesense.utils import read_jsonl
 from scenesense.vqa.format import prompt, target
 
 SRC, OUT, N = sys.argv[1], sys.argv[2], 256
 proc = AutoProcessor.from_pretrained(SRC, min_pixels=256 * 28 * 28, max_pixels=1024 * 28 * 28)
 model = Qwen2VLForConditionalGeneration.from_pretrained(SRC, dtype=torch.bfloat16)
-rows = [json.loads(l) for l in open("data/vqa/train.jsonl")][:N]
+rows = read_jsonl("data/vqa/train.jsonl")[:N]
 
 
 def encode(r):

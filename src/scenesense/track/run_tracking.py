@@ -9,8 +9,8 @@ import cv2
 import numpy as np
 import supervision as sv
 import torch
-from PIL import Image
 from nuscenes.nuscenes import NuScenes
+from PIL import Image
 from torchvision.ops import nms
 from transformers import RTDetrForObjectDetection, RTDetrImageProcessor
 
@@ -64,7 +64,7 @@ def track_scene(nusc, scene, model, proc, out_dir, threshold=0.1, video=False,
     log = nusc.get("log", scene["log_token"])
     frames = scene_frames(nusc, scene)
     id2label = model.config.id2label
-    tracker = ByteTrack(frame_rate=12, new=new_thresh)
+    tracker = ByteTrack(new=new_thresh)
     t0 = frames[0]["timestamp"]
     events = []
     start = time.time()

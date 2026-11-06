@@ -1,14 +1,23 @@
 import json
+
 import numpy as np
-from scenesense.eval.map_ci import coco_map, bootstrap_map, _evaluate_once, _map_on_subset, _quiet
 from pycocotools.coco import COCO
+
+from scenesense.eval.map_ci import (
+    _evaluate_once,
+    _map_on_subset,
+    _quiet,
+    bootstrap_map,
+    coco_map,
+)
+from scenesense.utils import read_json
 
 GT, PRED = "data/coco/mini.json", "data/coco/pred_shifted.json"
 
 
 def _materialise(ids, tmp_path):
     """Write a GT/pred pair where each drawn image is a fresh copy with a new id (repeats kept)."""
-    gt, pred = json.load(open(GT)), json.load(open(PRED))
+    gt, pred = read_json(GT), read_json(PRED)
     imgs = {im["id"]: im for im in gt["images"]}
     anns, dets = {}, {}
     for a in gt["annotations"]:
@@ -52,5 +61,5 @@ def test_seed_is_deterministic():
 
 def test_paired_difference_excludes_zero():
     res = bootstrap_map(GT, ["data/coco/pred_perfect.json", PRED], n_boot=50)
-    point, lo, hi, _ = res["pred_perfect-pred_shifted"]
+    point, lo, _hi, _ = res["pred_perfect-pred_shifted"]
     assert point > 0 and lo > 0

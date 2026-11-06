@@ -7,6 +7,7 @@ this process only orchestrates, so it needs no GPU.
 """
 import io
 import time
+from typing import Annotated
 
 import httpx
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
@@ -33,7 +34,7 @@ def _probe(url):
         r = httpx.get(f"{url}/models", timeout=2)
         r.raise_for_status()
         return {"ok": True, "models": [m["id"] for m in r.json()["data"]]}
-    except Exception as e:                                # report, don't raise: health shows what is down
+    except Exception as e:  # noqa: BLE001  report, don't raise: health shows what is down
         return {"ok": False, "error": f"{type(e).__name__}: {e}"}
 
 
@@ -59,7 +60,7 @@ async def ask(req: AskRequest):
 
 
 @app.post("/vqa")
-async def vqa(image: UploadFile = File(...), question: str = Form(...)):
+async def vqa(image: Annotated[UploadFile, File()], question: Annotated[str, Form()]):
     """Ask the fine-tuned VLM one question in a trained form about an uploaded image."""
     data = await image.read()
     if len(data) > MAX_IMAGE_BYTES:

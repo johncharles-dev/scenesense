@@ -1,14 +1,14 @@
 """Write an Ultralytics YOLO dataset (symlinked images + txt labels) from our COCO JSON."""
 import argparse
-import json
 import os
 from pathlib import Path
 
 from scenesense.data.nuimages_to_coco import CLASSES
+from scenesense.utils import read_json
 
 
 def convert(gt_path, images_root, out_root, split):
-    d = json.load(open(gt_path))
+    d = read_json(gt_path)
     anns = {}
     for a in d["annotations"]:
         anns.setdefault(a["image_id"], []).append(a)

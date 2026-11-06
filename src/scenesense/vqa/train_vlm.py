@@ -1,6 +1,5 @@
 """LoRA fine-tuning of Qwen2-VL-2B on the scenesense VQA set."""
 import argparse
-import json
 import os
 from pathlib import Path
 
@@ -8,15 +7,21 @@ import torch
 from peft import LoraConfig, get_peft_model
 from PIL import Image
 from torch.utils.data import Dataset
-from transformers import AutoProcessor, Qwen2VLForConditionalGeneration, Trainer, TrainingArguments
+from transformers import (
+    AutoProcessor,
+    Qwen2VLForConditionalGeneration,
+    Trainer,
+    TrainingArguments,
+)
 
+from scenesense.utils import read_jsonl
 from scenesense.vqa.eval_vlm import MAX_PIXELS, MIN_PIXELS
 from scenesense.vqa.format import prompt, target
 
 
 class VQA(Dataset):
     def __init__(self, path, limit=None):
-        self.rows = [json.loads(l) for l in open(path)][:limit]
+        self.rows = read_jsonl(path)[:limit]
 
     def __len__(self):
         return len(self.rows)

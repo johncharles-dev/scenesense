@@ -1,12 +1,15 @@
 """COCO mAP with bootstrap 95% confidence intervals."""
-from pycocotools.coco import COCO
-from pycocotools.cocoeval import COCOeval
-import contextlib, io
-import numpy as np
+import contextlib
 import copy
+import io
 import json
 from pathlib import Path
+
+import numpy as np
+from pycocotools.coco import COCO
+from pycocotools.cocoeval import COCOeval
 from tqdm import tqdm
+
 
 def _quiet(fn):
     """Run fn() with COCOeval's printing suppressed."""
@@ -54,7 +57,7 @@ def bootstrap_map(gt_path, pred_paths, n_boot=500, seed=0, img_ids=None):
     evs = {}
     for p in tqdm(pred_paths, desc="evaluate"):
         name = Path(p).stem
-        dt = _quiet(lambda: gt.loadRes(p))
+        dt = _quiet(lambda p=p: gt.loadRes(p))
         evs[name] = _evaluate_once(gt, dt, ids)
     rng = np.random.default_rng(seed)
     samples = {k: np.empty(n_boot) for k in evs}

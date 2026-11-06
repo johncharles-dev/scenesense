@@ -1,6 +1,15 @@
 """Rule-based agent scorer: parsing and per-type correctness on hand-written answers."""
-from scenesense.agent.eval_agent import (bootstrap, citation_ok, citations, claims, correct, log_supported,
-                                          numbers, question_class, yes_no)
+from scenesense.agent.eval_agent import (
+    bootstrap,
+    citation_ok,
+    citations,
+    claims,
+    correct,
+    log_supported,
+    numbers,
+    question_class,
+    yes_no,
+)
 
 COUNT = {"type": "count", "answer": 78, "scenes": ["scene-1077"]}
 ZERO = {"type": "count", "answer": 0, "scenes": ["scene-0103"]}
