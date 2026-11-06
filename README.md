@@ -250,7 +250,7 @@ vllm serve Qwen/Qwen2.5-14B-Instruct-AWQ --served-model-name agent-llm --max-mod
 uv run uvicorn scenesense.serve.api:app --host 0.0.0.0 --port 8080
 ```
 
-Start the LLM only after the VLM is up: vLLM checks at startup that *free* GPU memory covers its share, so starting both at once can fail. `docker-compose.yml` encodes this order with healthchecks (`vlm` → `llm` → `api`). **The compose file is validated (`docker compose config`, image tags checked) but has not been run end-to-end yet**; the endpoints above were tested against the servers started by hand.
+Start the LLM only after the VLM is up: vLLM checks at startup that *free* GPU memory covers its share, so starting both at once can fail. `docker-compose.yml` encodes this order with healthchecks (`vlm` → `llm` → `api`). **The compose stack has been run end-to-end:** all three containers come up healthy in order, `/health` reports ok and `/ask` returns the same answer as the hand-started servers.
 
 ## Future work
 
