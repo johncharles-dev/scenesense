@@ -109,6 +109,7 @@ The fine-tuned RT-DETR runs on every front-camera frame (keyframes and sweeps, 1
 
 - **Class-agnostic NMS (IoU 0.7) before tracking.** The detector sometimes puts two boxes with different classes (car and truck) on one object; without NMS each starts its own track and the object is counted twice.
 - **One class per track (majority vote over its frames)** and **tracks shorter than 6 frames dropped** (0.5 s), which removes one-frame false positives and flicker.
+- **Lost-track buffer 30 frames = 2.5 s at 12 Hz** (the frame_rate argument is a no-op in this Ultralytics version, so it was removed).
 
 Result: **1,116 tracks and 33,665 detection events** over the 10 scenes, written to `data/tracks/scene-*.jsonl` (one line per box: scene, location, frame, time, track ID, class, score, box). An ID-switch proxy is ~7%, so counts of distinct track IDs can be slightly inflated; the agent's `count` tool reports this with every result. Tracking was not scored against ground truth (no MOTA/HOTA), because nuScenes tracking labels are 3D boxes and would need projecting to the camera; the agent eval below checks the logs only indirectly.
 
@@ -250,3 +251,7 @@ uv run uvicorn scenesense.serve.api:app --host 0.0.0.0 --port 8080
 ```
 
 Start the LLM only after the VLM is up: vLLM checks at startup that *free* GPU memory covers its share, so starting both at once can fail. `docker-compose.yml` encodes this order with healthchecks (`vlm` → `llm` → `api`). **The compose file is validated (`docker compose config`, image tags checked) but has not been run end-to-end yet**; the endpoints above were tested against the servers started by hand.
+
+## Future work
+
+- **Tracker lost-track buffer: 12 frames (1 s) vs 30 frames (2.5 s).** Re-run tracking with both settings and compare them on the ID-switch proxy. A shorter buffer drops occluded objects sooner (more new IDs, inflated counts); a longer one can re-attach the wrong object. Not run yet: changing it regenerates the logs and every agent number.
